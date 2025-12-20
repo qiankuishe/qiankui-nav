@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* 浅色模式配色 */
+  --bg-color: #faf8f5;        /* 背景色 - 温暖的米白色 */
+  --bg-card: #ffffff;         /* 卡片背景 - 纯白色 */
+  --text-color: #8b6642;      /* 主文字 - 深棕色 */
+  --text-secondary: #a67c52;  /* 次要文字 - 中棕色 */
+  --border-color: #e8dfd3;    /* 边框色 - 浅棕色 */
+  --primary-color: #a67c52;   /* 主色调 - 棕色 */
+  --primary-hover: #8b6642;   /* 主色悬浮 - 深棕色 */
+  --hover-bg: #f5efe8;        /* 悬浮背景 - 浅米色 */
+  --accent-color: #d4a574;    /* 强调色 - 浅棕色 */
+  --shadow-color: rgba(166, 124, 82, 0.1); /* 阴影色 */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 深色模式配色 - 与qiankui-sub保持一致 */
+.dark {
+  --bg-color: #1a1612;        /* 背景色 - 深棕黑色 */
+  --bg-card: #252019;         /* 卡片背景 - 深棕色 */
+  --text-color: #d4a574;      /* 主文字 - 浅棕色 */
+  --text-secondary: #b8a68e;  /* 次要文字 - 灰棕色 */
+  --border-color: #3d3229;    /* 边框色 - 中深棕色 */
+  --primary-color: #d4a574;   /* 主色调 - 浅棕色 */
+  --primary-hover: #e8c49a;   /* 主色悬浮 - 更浅棕色 */
+  --hover-bg: #2d261f;        /* 悬浮背景 - 中深棕色 */
+  --accent-color: #a67c52;    /* 强调色 - 中棕色 */
+  --shadow-color: rgba(0, 0, 0, 0.3); /* 阴影色 */
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 统一的搜索高亮样式 */
+.search-highlight {
+  background-color: rgba(166, 124, 82, 0.2) !important;
+  box-shadow: 0 0 0 3px var(--primary-color), 0 6px 16px rgba(166, 124, 82, 0.3);
+  transform: scale(1.01);
+  transition: all 0.3s ease;
+  border-radius: 12px;
+  position: relative;
+  z-index: 10;
+}
+
+.dark .search-highlight {
+  background-color: rgba(212, 165, 116, 0.2) !important;
+  box-shadow: 0 0 0 3px var(--primary-color), 0 6px 16px rgba(212, 165, 116, 0.3);
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
