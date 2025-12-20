@@ -1,0 +1,32 @@
+{
+  "name": "qiankui-nav",
+  "version": "1.0.0",
+  "description": "A lightweight self-hosted navigation page with bookmarks, notes, and clipboard. Single Docker image, SQLite storage, zero external dependencies.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "docker:build": "docker build -t qiankui-nav .",
+    "docker:run": "docker run -d -p 3000:3000 -v qiankui-data:/app/data qiankui-nav"
+  },
+  "dependencies": {
+    "@fastify/cors": "^8.4.0",
+    "@fastify/static": "^6.12.0",
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^9.2.2",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.24.3",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.9.0",
+    "@types/uuid": "^9.0.6",
+    "tsx": "^4.1.4",
+    "typescript": "^5.2.2"
+  }
+}
