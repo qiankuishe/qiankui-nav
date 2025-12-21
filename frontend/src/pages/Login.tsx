@@ -1,9 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { useAuth } from '../hooks/useAuth'
 import { getPublicSettings } from '../utils/settingsApi'
 import PublicStickers, { MobileStickerList } from '../components/PublicStickers'
+
+interface EscapedStickerData {
+  sticker: { id: string; type: string; title: string; content: string }
+  color: { bg: string; border: string; text: string }
+}
 
 export default function Login() {
   const { login, isAuthenticated, isLoading } = useAuth()
@@ -17,7 +22,12 @@ export default function Login() {
   const [siteName, setSiteName] = useState('qiankui导航')
   const [logoUrl, setLogoUrl] = useState('')
   const [showMobileStickers, setShowMobileStickers] = useState(false)
+  const [escapedStickerData, setEscapedStickerData] = useState<EscapedStickerData | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const handleEscapedStickerData = useCallback((data: EscapedStickerData | null) => {
+    setEscapedStickerData(data)
+  }, [])
 
   useEffect(() => {
     loadSiteSettings()
@@ -140,9 +150,14 @@ export default function Login() {
       style={{ background: 'linear-gradient(135deg, var(--color-bg-main) 0%, var(--color-bg-card) 100%)' }}
     >
       {/* 公开便签 */}
-      <PublicStickers onShowMobileList={() => setShowMobileStickers(true)} />
+      <PublicStickers 
+        onShowMobileList={() => setShowMobileStickers(true)} 
+        onEscapedStickerData={handleEscapedStickerData}
+      />
 
-      <div className="w-full max-w-[420px] bg-bg-card rounded-3xl border border-border-main shadow-xl overflow-hidden relative z-10">
+      {/* 登录框容器 - 使用 flex-col 布局，逃逸标签在下方 */}
+      <div className="flex flex-col items-center relative z-10">
+        <div className="w-full max-w-[420px] bg-bg-card rounded-3xl border border-border-main shadow-xl overflow-hidden">
         {/* Header */}
         <div 
           className="flex items-center gap-4 px-9 pt-8 pb-6"
@@ -242,6 +257,24 @@ export default function Login() {
             )}
           </button>
         </form>
+      </div>
+
+        {/* 移动端：30%概率逃逸标签 - 在登录框下方动态显示 */}
+        {escapedStickerData && (
+          <div
+            className="md:hidden mt-6 cursor-pointer animate-wiggle"
+            onClick={() => setShowMobileStickers(true)}
+          >
+            <div 
+              className={`${escapedStickerData.color.bg} ${escapedStickerData.color.border} border rounded-lg px-4 py-2 shadow-lg`}
+              style={{ transform: 'rotate(-3deg)' }}
+            >
+              <span className={`text-xs font-medium ${escapedStickerData.color.text} truncate block max-w-24`}>
+                {escapedStickerData.sticker.title || '便签'}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
