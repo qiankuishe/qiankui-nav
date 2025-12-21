@@ -8,7 +8,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = getAuthUser(request)
     if (!user) {
-      return reply.status(401).send({ error: '未登录' })
+      return reply.status(401).send({ success: false, error: '未登录' })
     }
     ;(request as any).user = user
   })
@@ -34,7 +34,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
     const note = db.prepare('SELECT * FROM notes WHERE id = ? AND user_id = ?').get(id, userId)
     
     if (!note) {
-      return reply.status(404).send({ error: '笔记不存在' })
+      return reply.status(404).send({ success: false, error: '笔记不存在' })
     }
 
     return { success: true, data: note }
@@ -69,7 +69,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
     if (content !== undefined) { updates.push('content = ?'); values.push(content) }
     
     if (updates.length === 0) {
-      return reply.status(400).send({ error: '没有要更新的内容' })
+      return reply.status(400).send({ success: false, error: '没有要更新的内容' })
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP')
@@ -90,6 +90,15 @@ export async function notesRoutes(fastify: FastifyInstance) {
     const db = getDb()
     
     db.prepare('DELETE FROM notes WHERE id = ? AND user_id = ?').run(id, userId)
+    return { success: true }
+  })
+
+  // 批量删除所有笔记
+  fastify.delete('/all/items', async (request: FastifyRequest) => {
+    const userId = (request as any).user.userId
+    const db = getDb()
+    
+    db.prepare('DELETE FROM notes WHERE user_id = ?').run(userId)
     return { success: true }
   })
 }

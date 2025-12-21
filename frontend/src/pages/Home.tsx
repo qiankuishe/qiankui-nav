@@ -1,5 +1,6 @@
-    import { useState, useEffect, useRef } from 'react'
+    import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { useEventListener } from '../hooks/useEventListener'
 import { DragDropProvider, SortableProvider } from '../contexts/DragDropContext'
 import { useDragOperations } from '../hooks/useDragOperations'
 import { useDragFeedback } from '../components/DragFeedback'
@@ -14,8 +15,6 @@ import {
   DocumentTextIcon,
   ClipboardDocumentListIcon,
   FolderIcon,
-  ChevronUpIcon,
-  ChevronDownIcon,
   PlusIcon,
   XMarkIcon,
   SunIcon,
@@ -68,7 +67,11 @@ export default function Home() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<ActiveTab>('nav')
+  // 从 sessionStorage 恢复 activeTab
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    const saved = sessionStorage.getItem('activeTab')
+    return (saved as ActiveTab) || 'nav'
+  })
   // 手机端默认关闭侧边栏，桌面端默认打开
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024)
   const [searchQuery, setSearchQuery] = useState('')
@@ -98,15 +101,51 @@ export default function Home() {
   const [clipboardItems, setClipboardItems] = useState<Array<{ id: string; title: string; content: string; type: string }>>([])
   const highlightedRef = useRef<string | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
+  
+  // 分类拖拽状态
+  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null)
+  const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null)
+
+  // 保存 activeTab 到 sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('activeTab', activeTab)
+  }, [activeTab])
+
+  // 保存滚动位置
+  useEffect(() => {
+    const handleScroll = () => {
+      sessionStorage.setItem(`scrollPos_${activeTab}`, String(window.scrollY))
+    }
+    
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [activeTab])
+
+  // 恢复滚动位置
+  useEffect(() => {
+    if (loading) return
+    
+    const savedPos = sessionStorage.getItem(`scrollPos_${activeTab}`)
+    if (savedPos) {
+      setTimeout(() => {
+        window.scrollTo(0, Number(savedPos))
+      }, 100)
+    }
+  }, [activeTab, loading])
 
   useEffect(() => { loadCategories(); loadSearchData(); loadSiteSettings() }, [])
   
   // 监听网站设置更新事件
-  useEffect(() => {
-    const handleSettingsUpdate = () => loadSiteSettings()
-    window.addEventListener('siteSettingsUpdated', handleSettingsUpdate)
-    return () => window.removeEventListener('siteSettingsUpdated', handleSettingsUpdate)
-  }, [])
+  useEventListener('siteSettingsUpdated', useCallback(() => loadSiteSettings(), []))
+  
+  // 监听导航数据删除事件
+  useEventListener('navigationDataDeleted', useCallback(() => setCategories([]), []))
+  
+  // 监听数据导入事件
+  useEventListener('dataImported', useCallback(() => {
+    loadCategories()
+    loadSearchData()
+  }, []))
   
   // 切换到站内搜索时重新加载数据
   useEffect(() => {
@@ -372,16 +411,22 @@ export default function Home() {
     setSaving(true)
     try {
       if (modal.type === 'addCategory') {
-        await navigationAPI.createCategory(formData.name.trim(), categories.length)
+        const result = await navigationAPI.createCategory(formData.name.trim(), categories.length)
+        // 乐观更新：直接添加到本地状态
+        if (result.data) {
+          setCategories(prev => [...prev, { id: result.data!.id, name: formData.name.trim(), order: prev.length, links: [] }])
+        }
         showSuccess('分类已添加')
       } else if (modal.type === 'editCategory' && modal.data) {
         await navigationAPI.updateCategory(modal.data.id, { name: formData.name.trim() })
+        // 乐观更新：直接更新本地状态
+        setCategories(prev => prev.map(c => c.id === modal.data.id ? { ...c, name: formData.name.trim() } : c))
         showSuccess('分类已更新')
       }
       closeModal()
-      loadCategories()
     } catch {
       showError('保存失败')
+      loadCategories() // 失败时重新加载
     } finally {
       setSaving(false)
     }
@@ -393,12 +438,15 @@ export default function Home() {
   }
 
   const confirmDeleteCategory = async () => {
+    const categoryId = deleteConfirm.id
     try {
-      await navigationAPI.deleteCategory(deleteConfirm.id)
+      await navigationAPI.deleteCategory(categoryId)
+      // 乐观更新：直接从本地状态删除
+      setCategories(prev => prev.filter(c => c.id !== categoryId))
       showSuccess('分类已删除')
-      loadCategories()
     } catch {
       showError('删除失败')
+      loadCategories() // 失败时重新加载
     } finally {
       setDeleteConfirm({ isOpen: false, type: null, id: '', name: '' })
     }
@@ -417,13 +465,29 @@ export default function Home() {
       
       if (modal.type === 'addLink' && modal.data?.categoryId) {
         const category = categories.find(c => c.id === modal.data.categoryId)
-        await navigationAPI.createLink({
+        const result = await navigationAPI.createLink({
           categoryId: modal.data.categoryId,
           title: formData.title.trim(),
           url,
           description: formData.desc.trim() || undefined,
           order: category ? category.links.length : 0
         })
+        // 乐观更新：直接添加到本地状态
+        if (result.data) {
+          const newLink = {
+            id: result.data.id,
+            categoryId: modal.data.categoryId,
+            title: formData.title.trim(),
+            url,
+            description: formData.desc.trim() || undefined,
+            order: category ? category.links.length : 0
+          }
+          setCategories(prev => prev.map(c => 
+            c.id === modal.data.categoryId 
+              ? { ...c, links: [...c.links, newLink] }
+              : c
+          ))
+        }
         showSuccess('链接已添加')
       } else if (modal.type === 'editLink' && modal.data) {
         await navigationAPI.updateLink(modal.data.id, {
@@ -431,12 +495,20 @@ export default function Home() {
           url,
           description: formData.desc.trim() || undefined
         })
+        // 乐观更新：直接更新本地状态
+        setCategories(prev => prev.map(c => ({
+          ...c,
+          links: c.links.map(l => l.id === modal.data.id 
+            ? { ...l, title: formData.title.trim(), url, description: formData.desc.trim() || undefined }
+            : l
+          )
+        })))
         showSuccess('链接已更新')
       }
       closeModal()
-      loadCategories()
     } catch {
       showError('保存失败')
+      loadCategories() // 失败时重新加载
     } finally {
       setSaving(false)
     }
@@ -448,12 +520,18 @@ export default function Home() {
   }
 
   const confirmDeleteLink = async () => {
+    const linkId = deleteConfirm.id
     try {
-      await navigationAPI.deleteLink(deleteConfirm.id)
+      await navigationAPI.deleteLink(linkId)
+      // 乐观更新：直接从本地状态删除
+      setCategories(prev => prev.map(c => ({
+        ...c,
+        links: c.links.filter(l => l.id !== linkId)
+      })))
       showSuccess('链接已删除')
-      loadCategories()
     } catch {
       showError('删除失败')
+      loadCategories() // 失败时重新加载
     } finally {
       setDeleteConfirm({ isOpen: false, type: null, id: '', name: '' })
     }
@@ -467,38 +545,57 @@ export default function Home() {
     }
   }
 
-  // 分类上移
-  const moveCategoryUp = async (index: number) => {
-    if (index <= 0) return
+  // 分类拖拽处理
+  const handleCategoryDragStart = (e: React.DragEvent, categoryId: string) => {
+    setDraggedCategoryId(categoryId)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', categoryId)
+  }
+
+  const handleCategoryDragOver = (e: React.DragEvent, categoryId: string) => {
+    e.preventDefault()
+    if (draggedCategoryId && draggedCategoryId !== categoryId) {
+      setDragOverCategoryId(categoryId)
+    }
+  }
+
+  const handleCategoryDragLeave = () => {
+    setDragOverCategoryId(null)
+  }
+
+  const handleCategoryDrop = async (e: React.DragEvent, targetCategoryId: string) => {
+    e.preventDefault()
+    if (!draggedCategoryId || draggedCategoryId === targetCategoryId) {
+      setDraggedCategoryId(null)
+      setDragOverCategoryId(null)
+      return
+    }
+
+    const draggedIndex = categories.findIndex(c => c.id === draggedCategoryId)
+    const targetIndex = categories.findIndex(c => c.id === targetCategoryId)
+    
+    if (draggedIndex === -1 || targetIndex === -1) return
+
     const newCategories = [...categories]
-    const temp = newCategories[index]
-    newCategories[index] = newCategories[index - 1]
-    newCategories[index - 1] = temp
+    const [removed] = newCategories.splice(draggedIndex, 1)
+    newCategories.splice(targetIndex, 0, removed)
+    
     setCategories(newCategories)
+    setDraggedCategoryId(null)
+    setDragOverCategoryId(null)
+
     try {
       await updateCategoryOrder(newCategories.map(c => c.id))
-      showSuccess('分类已上移')
+      showSuccess('分类已移动')
     } catch {
       showError('移动失败')
       loadCategories()
     }
   }
 
-  // 分类下移
-  const moveCategoryDown = async (index: number) => {
-    if (index >= categories.length - 1) return
-    const newCategories = [...categories]
-    const temp = newCategories[index]
-    newCategories[index] = newCategories[index + 1]
-    newCategories[index + 1] = temp
-    setCategories(newCategories)
-    try {
-      await updateCategoryOrder(newCategories.map(c => c.id))
-      showSuccess('分类已下移')
-    } catch {
-      showError('移动失败')
-      loadCategories()
-    }
+  const handleCategoryDragEnd = () => {
+    setDraggedCategoryId(null)
+    setDragOverCategoryId(null)
   }
 
   const { showSuccess, showError, NotificationContainer } = useDragFeedback()
@@ -633,34 +730,29 @@ export default function Home() {
               <button onClick={() => setSelectedCategoryId(null)} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCategoryId === null ? 'bg-primary text-white font-medium' : 'text-text-main hover:bg-hover-bg'}`}>
                 全部 ({totalLinks})
               </button>
-              {categories.map((cat, index) => (
-                <div key={cat.id} className="group flex items-center gap-1">
-                  <button 
-                    onClick={() => setSelectedCategoryId(cat.id)} 
-                    className={`flex-1 text-left px-3 py-2.5 rounded-lg text-sm transition-colors truncate ${selectedCategoryId === cat.id ? 'bg-primary text-white font-medium' : 'text-text-main hover:bg-hover-bg'}`}
+              {categories.map((cat) => (
+                <div 
+                  key={cat.id} 
+                  className={`rounded-lg transition-all ${
+                    dragOverCategoryId === cat.id ? 'border-t-2 border-primary pt-1' : ''
+                  } ${isEditMode ? 'cursor-grab active:cursor-grabbing' : ''} ${
+                    draggedCategoryId === cat.id ? 'opacity-50' : ''
+                  }`}
+                  draggable={isEditMode}
+                  onDragStart={(e) => handleCategoryDragStart(e, cat.id)}
+                  onDragOver={(e) => handleCategoryDragOver(e, cat.id)}
+                  onDragLeave={handleCategoryDragLeave}
+                  onDrop={(e) => handleCategoryDrop(e, cat.id)}
+                  onDragEnd={handleCategoryDragEnd}
+                  onClick={() => !isEditMode && setSelectedCategoryId(cat.id)}
+                >
+                  <div 
+                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors truncate ${
+                      selectedCategoryId === cat.id ? 'bg-primary text-white font-medium' : 'text-text-main hover:bg-hover-bg'
+                    }`}
                   >
                     {cat.name} ({cat.links.length})
-                  </button>
-                  {isEditMode && (
-                    <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); moveCategoryUp(index) }}
-                        disabled={index === 0}
-                        className={`p-0.5 rounded hover:bg-hover-bg ${index === 0 ? 'opacity-30 cursor-not-allowed' : 'text-text-secondary hover:text-text-main'}`}
-                        title="上移"
-                      >
-                        <ChevronUpIcon className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); moveCategoryDown(index) }}
-                        disabled={index === categories.length - 1}
-                        className={`p-0.5 rounded hover:bg-hover-bg ${index === categories.length - 1 ? 'opacity-30 cursor-not-allowed' : 'text-text-secondary hover:text-text-main'}`}
-                        title="下移"
-                      >
-                        <ChevronDownIcon className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
+                  </div>
                 </div>
               ))}
             </nav>
@@ -788,29 +880,6 @@ export default function Home() {
                             </h2>
                             {isEditMode && (
                               <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    const idx = categories.findIndex(c => c.id === cat.id)
-                                    moveCategoryUp(idx)
-                                  }}
-                                  disabled={categories.findIndex(c => c.id === cat.id) === 0}
-                                  className={`p-1.5 rounded-lg hover:bg-hover-bg ${categories.findIndex(c => c.id === cat.id) === 0 ? 'opacity-30 cursor-not-allowed' : 'text-text-secondary hover:text-text-main'}`}
-                                  title="上移分类"
-                                >
-                                  <ChevronUpIcon className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    const idx = categories.findIndex(c => c.id === cat.id)
-                                    moveCategoryDown(idx)
-                                  }}
-                                  disabled={categories.findIndex(c => c.id === cat.id) === categories.length - 1}
-                                  className={`p-1.5 rounded-lg hover:bg-hover-bg ${categories.findIndex(c => c.id === cat.id) === categories.length - 1 ? 'opacity-30 cursor-not-allowed' : 'text-text-secondary hover:text-text-main'}`}
-                                  title="下移分类"
-                                >
-                                  <ChevronDownIcon className="w-4 h-4" />
-                                </button>
-                                <span className="w-px h-5 bg-border-main" />
                                 <button onClick={() => openEditCategory(cat)} className="text-sm text-primary hover:underline font-medium">
                                   编辑
                                 </button>

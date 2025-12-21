@@ -1,7 +1,15 @@
 import jwt, { SignOptions } from 'jsonwebtoken'
 import { FastifyRequest } from 'fastify'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+import crypto from 'crypto'
+
+// 生产环境必须设置 JWT_SECRET 环境变量
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('⚠️ 警告: 生产环境未设置 JWT_SECRET，使用随机密钥（重启后会话失效）')
+  }
+  return crypto.randomBytes(32).toString('hex')
+})()
 
 export interface JWTPayload {
   userId: string

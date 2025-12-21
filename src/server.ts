@@ -13,15 +13,26 @@ import { settingsRoutes } from './routes/settings.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const fastify = Fastify({ logger: true })
+const fastify = Fastify({ 
+  logger: true,
+  bodyLimit: 10 * 1024 * 1024 // 限制请求体最大 10MB
+})
 
 async function start() {
   // 初始化数据库
   await initDatabase()
 
-  // CORS
+  // 安全响应头
+  fastify.addHook('onSend', async (request, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff')
+    reply.header('X-Frame-Options', 'SAMEORIGIN')
+    reply.header('X-XSS-Protection', '1; mode=block')
+  })
+
+  // CORS - 生产环境应限制来源
+  const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || []
   await fastify.register(cors, {
-    origin: true,
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
     credentials: true
   })
 

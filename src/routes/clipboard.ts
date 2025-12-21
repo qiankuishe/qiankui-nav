@@ -8,7 +8,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = getAuthUser(request)
     if (!user) {
-      return reply.status(401).send({ error: '未登录' })
+      return reply.status(401).send({ success: false, error: '未登录' })
     }
     ;(request as any).user = user
   })
@@ -30,7 +30,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     sql += ' ORDER BY updated_at DESC'
     const items = db.prepare(sql).all(...params)
 
-    return { data: items }
+    return { success: true, data: items }
   })
 
   // 获取单个剪贴板项目
@@ -42,10 +42,10 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     const item = db.prepare('SELECT * FROM clipboard_items WHERE id = ? AND user_id = ?').get(id, userId)
     
     if (!item) {
-      return reply.status(404).send({ error: '剪贴板项目不存在' })
+      return reply.status(404).send({ success: false, error: '剪贴板项目不存在' })
     }
 
-    return { data: item }
+    return { success: true, data: item }
   })
 
   // 创建剪贴板项目
@@ -54,14 +54,13 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     const { type, title, content } = request.body as { type?: string; title?: string; content?: string }
     
     if (!type) {
-      return reply.status(400).send({ error: '类型不能为空' })
+      return reply.status(400).send({ success: false, error: '类型不能为空' })
     }
     
     if (!['text', 'code', 'image'].includes(type)) {
-      return reply.status(400).send({ error: '类型必须是 text、code 或 image' })
+      return reply.status(400).send({ success: false, error: '类型必须是 text、code 或 image' })
     }
 
-    // 允许空 title，使用默认值
     const finalTitle = title || (type === 'code' ? '代码片段' : type === 'image' ? '图片' : '文本')
 
     const db = getDb()
@@ -72,7 +71,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     `).run(id, userId, type, finalTitle, content || '')
 
     const item = db.prepare('SELECT * FROM clipboard_items WHERE id = ?').get(id)
-    return reply.status(201).send({ data: item })
+    return reply.status(201).send({ success: true, data: item })
   })
 
   // 更新剪贴板项目
@@ -89,7 +88,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     if (content !== undefined) { updates.push('content = ?'); values.push(content) }
     
     if (updates.length === 0) {
-      return reply.status(400).send({ error: '没有要更新的内容' })
+      return reply.status(400).send({ success: false, error: '没有要更新的内容' })
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP')
@@ -100,11 +99,11 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     `).run(...values)
 
     if (result.changes === 0) {
-      return reply.status(404).send({ error: '剪贴板项目不存在' })
+      return reply.status(404).send({ success: false, error: '剪贴板项目不存在' })
     }
 
     const item = db.prepare('SELECT * FROM clipboard_items WHERE id = ?').get(id)
-    return { data: item }
+    return { success: true, data: item }
   })
 
   // 删除剪贴板项目
@@ -116,10 +115,10 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     const result = db.prepare('DELETE FROM clipboard_items WHERE id = ? AND user_id = ?').run(id, userId)
     
     if (result.changes === 0) {
-      return reply.status(404).send({ error: '剪贴板项目不存在' })
+      return reply.status(404).send({ success: false, error: '剪贴板项目不存在' })
     }
 
-    return reply.status(204).send()
+    return { success: true }
   })
 
   // 搜索剪贴板项目
@@ -128,7 +127,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     const { q, type } = request.query as { q?: string; type?: string }
     
     if (!q || q.trim().length === 0) {
-      return reply.status(400).send({ error: '搜索关键词不能为空' })
+      return reply.status(400).send({ success: false, error: '搜索关键词不能为空' })
     }
 
     const db = getDb()
@@ -144,6 +143,15 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     sql += ' ORDER BY updated_at DESC'
     const items = db.prepare(sql).all(...params)
 
-    return { data: items }
+    return { success: true, data: items }
+  })
+
+  // 批量删除所有剪贴板项目
+  fastify.delete('/all/items', async (request: FastifyRequest) => {
+    const userId = (request as any).user.userId
+    const db = getDb()
+    
+    db.prepare('DELETE FROM clipboard_items WHERE user_id = ?').run(userId)
+    return { success: true }
   })
 }

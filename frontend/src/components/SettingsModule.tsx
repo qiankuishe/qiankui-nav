@@ -8,7 +8,11 @@ import {
   Cog6ToothIcon,
   PhotoIcon,
   XMarkIcon,
+  ExclamationTriangleIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline'
+import ConfirmModal from './ConfirmModal'
+import api from '../utils/api'
 import {
   downloadExportData,
   importUserData,
@@ -20,12 +24,13 @@ import {
   type ExportData
 } from '../utils/settingsApi'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../hooks/useToast'
 
 export default function SettingsModule() {
   const { logout, user } = useAuth()
+  const { showSuccess, showError, ToastContainer } = useToast()
   const [exportStats, setExportStats] = useState<ExportStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   
   // 网站设置
   const [websiteName, setWebsiteName] = useState('')
@@ -39,6 +44,14 @@ export default function SettingsModule() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [saving, setSaving] = useState(false)
+  
+  // 危险区域
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean
+    type: 'navigation' | 'notes' | 'clipboard' | null
+    title: string
+    message: string
+  }>({ isOpen: false, type: null, title: '', message: '' })
 
   useEffect(() => {
     loadData()
@@ -60,15 +73,10 @@ export default function SettingsModule() {
     }
   }
 
-  const showMessage = (type: 'success' | 'error', text: string) => {
-    setMessage({ type, text })
-    setTimeout(() => setMessage(null), 2000)
-  }
-
   const handleSiteSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!websiteName.trim()) {
-      showMessage('error', '网站名称不能为空')
+      showError('网站名称不能为空')
       return
     }
     try {
@@ -77,11 +85,11 @@ export default function SettingsModule() {
         website_name: websiteName.trim(),
         logo_url: logoUrl
       })
-      showMessage('success', '保存成功')
+      showSuccess('保存成功')
       // 触发页面刷新以更新侧边栏
       window.dispatchEvent(new CustomEvent('siteSettingsUpdated'))
     } catch (error: any) {
-      showMessage('error', error.message || '保存失败')
+      showError(error.message || '保存失败')
     } finally {
       setSavingSite(false)
     }
@@ -93,13 +101,13 @@ export default function SettingsModule() {
     
     // 检查文件类型
     if (!file.type.startsWith('image/')) {
-      showMessage('error', '请选择图片文件')
+      showError('请选择图片文件')
       return
     }
     
     // 检查文件大小 (最大 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      showMessage('error', '图片大小不能超过 5MB')
+      showError('图片大小不能超过 5MB')
       return
     }
     
@@ -122,9 +130,9 @@ export default function SettingsModule() {
   const handleExport = async () => {
     try {
       await downloadExportData()
-      showMessage('success', '导出成功')
+      showSuccess('导出成功')
     } catch (error) {
-      showMessage('error', '导出失败')
+      showError('导出失败')
     }
   }
 
@@ -135,12 +143,16 @@ export default function SettingsModule() {
       const text = await file.text()
       const data: ExportData = JSON.parse(text)
       const result = await importUserData(data)
-      showMessage(result.success ? 'success' : 'error', result.message)
+      result.success ? showSuccess(result.message) : showError(result.message)
       if (result.success) {
-        loadData()
+        // 延迟刷新数据，让消息提示先显示
+        setTimeout(() => {
+          loadData()
+          window.dispatchEvent(new CustomEvent('dataImported'))
+        }, 800)
       }
     } catch (error) {
-      showMessage('error', '导入失败')
+      showError('导入失败')
     }
   }
 
@@ -148,24 +160,24 @@ export default function SettingsModule() {
     e.preventDefault()
     
     if (!currentPassword) {
-      showMessage('error', '请输入当前密码')
+      showError('请输入当前密码')
       return
     }
     
     // 检查是否有修改
     if (!newUsername.trim() && !newPassword) {
-      showMessage('error', '请输入新用户名或新密码')
+      showError('请输入新用户名或新密码')
       return
     }
     
     // 如果修改密码，检查确认密码
     if (newPassword && newPassword !== confirmPassword) {
-      showMessage('error', '两次密码不一致')
+      showError('两次密码不一致')
       return
     }
     
     if (newPassword && newPassword.length < 6) {
-      showMessage('error', '新密码至少6位')
+      showError('新密码至少6位')
       return
     }
     
@@ -176,16 +188,50 @@ export default function SettingsModule() {
         newPassword || undefined, 
         newUsername.trim() || undefined
       )
-      showMessage('success', '修改成功，请重新登录')
+      showSuccess('修改成功，请重新登录')
       setCurrentPassword('')
       setNewUsername('')
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => logout(), 1500)
     } catch (error: any) {
-      showMessage('error', error.message || '修改失败')
+      showError(error.message || '修改失败')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // 危险区域删除操作
+  const openDeleteConfirm = (type: 'navigation' | 'notes' | 'clipboard') => {
+    const configs = {
+      navigation: { title: '删除所有导航', message: '确定删除所有分类和链接？此操作不可恢复！' },
+      notes: { title: '删除所有笔记', message: '确定删除所有笔记？此操作不可恢复！' },
+      clipboard: { title: '删除所有剪贴板', message: '确定删除所有剪贴板内容？此操作不可恢复！' }
+    }
+    setDeleteConfirm({ isOpen: true, type, ...configs[type] })
+  }
+
+  const handleBulkDelete = async () => {
+    if (!deleteConfirm.type) return
+    
+    try {
+      const endpoints = {
+        navigation: '/api/navigation/all',
+        notes: '/api/notes/all/items',
+        clipboard: '/api/clipboard/all/items'
+      }
+      await api.delete(endpoints[deleteConfirm.type])
+      showSuccess('删除成功')
+      loadData()
+      // 根据删除类型触发对应的更新事件
+      if (deleteConfirm.type === 'navigation') {
+        window.dispatchEvent(new CustomEvent('navigationDataDeleted'))
+      }
+      window.dispatchEvent(new CustomEvent('siteSettingsUpdated'))
+    } catch (error) {
+      showError('删除失败')
+    } finally {
+      setDeleteConfirm({ isOpen: false, type: null, title: '', message: '' })
     }
   }
 
@@ -199,14 +245,7 @@ export default function SettingsModule() {
 
   return (
     <div className="h-full overflow-y-auto">
-      {/* 消息提示 - 顶部居中 */}
-      {message && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-white text-sm shadow-lg ${
-          message.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-        }`}>
-          {message.text}
-        </div>
-      )}
+      <ToastContainer />
 
       <div className="max-w-2xl mx-auto p-5 space-y-5">
 
@@ -387,10 +426,39 @@ export default function SettingsModule() {
           </form>
         </section>
 
-      </div>
-      
-      {/* 退出登录 - 独立于 space-y 容器 */}
-      <div className="max-w-2xl mx-auto px-5 pb-5 pt-[31px]">
+        {/* 危险区域 */}
+        <section className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl p-5">
+          <h3 className="text-base font-medium text-red-600 dark:text-red-400 mb-4 flex items-center gap-2">
+            <ExclamationTriangleIcon className="w-5 h-5" />
+            危险区域
+          </h3>
+          
+          <div className="space-y-3">
+            <button
+              onClick={() => openDeleteConfirm('navigation')}
+              className="w-full px-4 py-2.5 bg-white dark:bg-red-950/50 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 transition-colors text-sm flex items-center justify-center gap-2"
+            >
+              <TrashIcon className="w-4 h-4" />
+              删除所有导航（分类和链接）
+            </button>
+            <button
+              onClick={() => openDeleteConfirm('notes')}
+              className="w-full px-4 py-2.5 bg-white dark:bg-red-950/50 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 transition-colors text-sm flex items-center justify-center gap-2"
+            >
+              <TrashIcon className="w-4 h-4" />
+              删除所有笔记
+            </button>
+            <button
+              onClick={() => openDeleteConfirm('clipboard')}
+              className="w-full px-4 py-2.5 bg-white dark:bg-red-950/50 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 transition-colors text-sm flex items-center justify-center gap-2"
+            >
+              <TrashIcon className="w-4 h-4" />
+              删除所有剪贴板
+            </button>
+          </div>
+        </section>
+
+        {/* 退出登录 */}
         <button
           onClick={logout}
           className="w-full px-4 py-2.5 bg-bg-card border border-red-200 text-red-500 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors text-sm flex items-center justify-center gap-2"
@@ -398,7 +466,19 @@ export default function SettingsModule() {
           <ArrowRightStartOnRectangleIcon className="w-4 h-4" />
           退出登录
         </button>
+
       </div>
+      
+      {/* 删除确认弹窗 */}
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title={deleteConfirm.title}
+        message={deleteConfirm.message}
+        confirmText="确认删除"
+        type="danger"
+        onConfirm={handleBulkDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, type: null, title: '', message: '' })}
+      />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   ClipboardDocumentListIcon,
   DocumentTextIcon,
@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline'
 import ConfirmModal from './ConfirmModal'
 import api from '../utils/api'
+import { useEventListener } from '../hooks/useEventListener'
 
 interface ClipboardItem {
   id: string
@@ -35,6 +36,9 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   useEffect(() => {
     loadItems()
   }, [])
+
+  // 监听数据导入事件
+  useEventListener('dataImported', useCallback(() => loadItems(), []))
 
   useEffect(() => {
     if (highlightId && items.length > 0) {

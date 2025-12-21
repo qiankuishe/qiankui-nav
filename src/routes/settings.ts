@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import bcrypt from 'bcrypt'
+import { v4 as uuidv4 } from 'uuid'
 import { getDb } from '../db.js'
 import { getAuthUser } from '../auth.js'
 
@@ -8,7 +9,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = getAuthUser(request)
     if (!user) {
-      return reply.status(401).send({ error: '未登录' })
+      return reply.status(401).send({ success: false, error: '未登录' })
     }
     ;(request as any).user = user
   })
@@ -21,7 +22,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     const user = db.prepare('SELECT settings FROM users WHERE id = ?').get(userId) as any
     const settings = user?.settings ? JSON.parse(user.settings) : {}
 
-    return settings
+    return { success: true, data: settings }
   })
 
   // 更新用户设置
@@ -37,7 +38,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     db.prepare('UPDATE users SET settings = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(JSON.stringify(mergedSettings), userId)
 
-    return mergedSettings
+    return { success: true, data: mergedSettings }
   })
 
   // 导出用户数据
@@ -71,7 +72,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     reply.header('Content-Type', 'application/json')
     reply.header('Content-Disposition', `attachment; filename="navigation-backup-${new Date().toISOString().split('T')[0]}.json"`)
     
-    return exportData
+    return { success: true, data: exportData }
   })
 
   // 导入用户数据
@@ -88,7 +89,6 @@ export async function settingsRoutes(fastify: FastifyInstance) {
       if (importData.categories && Array.isArray(importData.categories)) {
         for (const cat of importData.categories) {
           try {
-            const { v4: uuidv4 } = await import('uuid')
             const catId = uuidv4()
             db.prepare(`
               INSERT INTO categories (id, user_id, name, "order") VALUES (?, ?, ?, ?)
@@ -106,7 +106,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
               }
             }
           } catch (e) {
-            errors.push(`Failed to import category: ${cat.name}`)
+            errors.push(`导入分类失败: ${cat.name}`)
           }
         }
       }
@@ -115,13 +115,12 @@ export async function settingsRoutes(fastify: FastifyInstance) {
       if (importData.notes && Array.isArray(importData.notes)) {
         for (const note of importData.notes) {
           try {
-            const { v4: uuidv4 } = await import('uuid')
             db.prepare(`
               INSERT INTO notes (id, user_id, title, content) VALUES (?, ?, ?, ?)
             `).run(uuidv4(), userId, note.title, note.content || '')
             imported.notes++
           } catch (e) {
-            errors.push(`Failed to import note: ${note.title}`)
+            errors.push(`导入笔记失败: ${note.title}`)
           }
         }
       }
@@ -130,13 +129,12 @@ export async function settingsRoutes(fastify: FastifyInstance) {
       if (importData.clipboard_items && Array.isArray(importData.clipboard_items)) {
         for (const item of importData.clipboard_items) {
           try {
-            const { v4: uuidv4 } = await import('uuid')
             db.prepare(`
               INSERT INTO clipboard_items (id, user_id, type, title, content) VALUES (?, ?, ?, ?, ?)
             `).run(uuidv4(), userId, item.type || 'text', item.title, item.content || '')
             imported.clipboard_items++
           } catch (e) {
-            errors.push(`Failed to import clipboard item: ${item.title}`)
+            errors.push(`导入剪贴板失败: ${item.title}`)
           }
         }
       }
@@ -163,7 +161,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     }
   })
 
-  // 更新账号凭证（用户名和/或密码）
+  // 更新账号凭证
   fastify.put('/credentials', async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = (request as any).user.userId
     const { currentPassword, newPassword, newUsername } = request.body as { 
@@ -173,43 +171,40 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     }
     
     if (!currentPassword) {
-      return reply.status(400).send({ error: '请输入当前密码' })
+      return reply.status(400).send({ success: false, error: '请输入当前密码' })
     }
     
-    // 至少要修改一项
     if (!newPassword && !newUsername) {
-      return reply.status(400).send({ error: '请输入新密码或新用户名' })
+      return reply.status(400).send({ success: false, error: '请输入新密码或新用户名' })
     }
     
     if (newPassword && newPassword.length < 6) {
-      return reply.status(400).send({ error: '新密码至少6位' })
+      return reply.status(400).send({ success: false, error: '新密码至少6位' })
     }
     
     if (newUsername && newUsername.length < 2) {
-      return reply.status(400).send({ error: '用户名至少2位' })
+      return reply.status(400).send({ success: false, error: '用户名至少2位' })
     }
 
     const db = getDb()
     const user = db.prepare('SELECT password_hash, username FROM users WHERE id = ?').get(userId) as any
     
     if (!user) {
-      return reply.status(404).send({ error: '用户不存在' })
+      return reply.status(404).send({ success: false, error: '用户不存在' })
     }
 
     const isValid = await bcrypt.compare(currentPassword, user.password_hash)
     if (!isValid) {
-      return reply.status(400).send({ error: '当前密码错误' })
+      return reply.status(400).send({ success: false, error: '当前密码错误' })
     }
 
-    // 检查新用户名是否已存在
     if (newUsername && newUsername !== user.username) {
       const existing = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(newUsername, userId)
       if (existing) {
-        return reply.status(400).send({ error: '用户名已存在' })
+        return reply.status(400).send({ success: false, error: '用户名已存在' })
       }
     }
 
-    // 构建更新语句
     const updates: string[] = []
     const params: any[] = []
     
@@ -251,10 +246,13 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     const clipboardCount = (db.prepare('SELECT COUNT(*) as count FROM clipboard_items WHERE user_id = ?').get(userId) as any).count
 
     return {
-      categories: categoriesCount,
-      links: linksCount,
-      notes: notesCount,
-      clipboard_items: clipboardCount
+      success: true,
+      data: {
+        categories: categoriesCount,
+        links: linksCount,
+        notes: notesCount,
+        clipboard_items: clipboardCount
+      }
     }
   })
 }

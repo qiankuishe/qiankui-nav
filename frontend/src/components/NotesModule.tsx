@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   DocumentTextIcon,
   PlusIcon,
@@ -13,6 +13,7 @@ import {
   deleteNote,
 } from '../utils/notesApi'
 import ConfirmModal from './ConfirmModal'
+import { useEventListener } from '../hooks/useEventListener'
 
 interface NotesModuleProps {
   highlightId?: string | null
@@ -25,12 +26,16 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
   const [saving, setSaving] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean
     noteId: string
     noteTitle: string
   }>({ isOpen: false, noteId: '', noteTitle: '' })
   const [localHighlightId, setLocalHighlightId] = useState<string | null>(null)
+  const processedHighlightRef = useRef<string | null>(null)
+  // 保存最新的编辑内容，用于防止保存丢失
+  const pendingContentRef = useRef<{ title: string; content: string } | null>(null)
 
   const saveTimeoutRef = useRef<number | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -56,8 +61,12 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     }
   }, [])
 
+  // 监听数据导入事件
+  useEventListener('dataImported', useCallback(() => loadNotes(), []))
+
   useEffect(() => {
-    if (highlightId && notes.length > 0) {
+    if (highlightId && notes.length > 0 && processedHighlightRef.current !== highlightId) {
+      processedHighlightRef.current = highlightId
       setLocalHighlightId(highlightId)
       const note = notes.find((n) => n.id === highlightId)
       if (note) {
@@ -65,19 +74,36 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
       }
       setTimeout(() => setLocalHighlightId(null), 2000)
     }
+    if (!highlightId) {
+      processedHighlightRef.current = null
+    }
   }, [highlightId, notes])
 
-  // 自动保存
+  // 自动保存 - 使用 ref 确保保存最新内容
   const autoSave = async (noteId: string, title: string, content: string) => {
+    // 更新待保存内容
+    pendingContentRef.current = { title, content }
+    
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
+    
+    setSaving(true)
+    
     saveTimeoutRef.current = window.setTimeout(async () => {
       try {
-        setSaving(true)
-        const updated = await updateNote(noteId, { title: title.trim() || '无标题', content })
+        // 使用 ref 中的最新内容
+        const latestContent = pendingContentRef.current
+        if (!latestContent) return
+        
+        const updated = await updateNote(noteId, { 
+          title: latestContent.title.trim() || '无标题', 
+          content: latestContent.content 
+        })
+        // 保存成功后更新时间
         setNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
-        setSelectedNote(updated)
+        setSelectedNote(prev => prev?.id === updated.id ? updated : prev)
+        pendingContentRef.current = null
       } catch (err) {
         console.error('Error saving note:', err)
       } finally {
@@ -94,18 +120,28 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     setSelectedNote(note)
     setEditTitle(note.title)
     setEditContent(note.content)
+    pendingContentRef.current = null
   }
 
-  const handleBack = () => {
+  const handleBack = async () => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
-      // 立即保存
-      if (selectedNote && (editTitle !== selectedNote.title || editContent !== selectedNote.content)) {
-        updateNote(selectedNote.id, { title: editTitle.trim() || '无标题', content: editContent })
-          .then(updated => setNotes(prev => prev.map(n => n.id === updated.id ? updated : n)))
+    }
+    // 立即保存
+    if (selectedNote && (editTitle !== selectedNote.title || editContent !== selectedNote.content)) {
+      try {
+        const updated = await updateNote(selectedNote.id, { 
+          title: editTitle.trim() || '无标题', 
+          content: editContent 
+        })
+        setNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
+      } catch (err) {
+        console.error('Error saving note:', err)
       }
     }
     setSelectedNote(null)
+    pendingContentRef.current = null
+    setSaving(false)
   }
 
   const handleCreateNote = async () => {
@@ -143,6 +179,11 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     setDeleteConfirm({ isOpen: true, noteId, noteTitle })
   }
 
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 2000)
+  }
+
   const confirmDelete = async () => {
     try {
       await deleteNote(deleteConfirm.noteId)
@@ -150,8 +191,10 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
         setSelectedNote(null)
       }
       await loadNotes()
+      showNotification('success', '已删除')
     } catch (err) {
       console.error('Error deleting note:', err)
+      showNotification('error', '删除失败')
     } finally {
       setDeleteConfirm({ isOpen: false, noteId: '', noteTitle: '' })
     }
@@ -161,14 +204,23 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+    
     if (diffInHours < 24) {
       return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     }
     if (diffInHours < 24 * 7) {
-      return date.toLocaleDateString('zh-CN', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+      return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
-    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
+
+  // 保存中的加载动画
+  const SavingSpinner = () => (
+    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+    </svg>
+  )
 
   if (loading) {
     return (
@@ -180,6 +232,12 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {notification && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-white text-sm shadow-lg ${notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
+          {notification.message}
+        </div>
+      )}
+
       <ConfirmModal
         isOpen={deleteConfirm.isOpen}
         title="删除笔记"
@@ -217,7 +275,12 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
         )}
         {selectedNote && (
           <div className="flex items-center gap-3">
-            {saving && <span className="text-xs text-text-secondary">保存中...</span>}
+            {saving && (
+              <span className="text-xs text-text-secondary flex items-center gap-1.5">
+                <SavingSpinner />
+                保存中...
+              </span>
+            )}
             <button 
               onClick={() => handleDeleteNote(selectedNote.id, selectedNote.title)}
               className="px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1.5"
@@ -250,7 +313,10 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
           </div>
           <div className="px-6 py-3 border-t border-border-main bg-hover-bg/30 flex items-center justify-between text-xs text-text-secondary">
             <span>{editContent.length} 字符</span>
-            <span>最后编辑：{formatDate(selectedNote.updated_at)}</span>
+            <span className="flex items-center gap-1.5">
+              {saving && <SavingSpinner />}
+              最后编辑：{formatDate(selectedNote.updated_at)}
+            </span>
           </div>
         </div>
       ) : (

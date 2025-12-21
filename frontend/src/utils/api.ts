@@ -57,11 +57,10 @@ export interface AuthResponse {
   }
   token?: string
   error?: string
-  lockoutInfo?: {
-    isLocked: boolean
-    lockedUntil?: string
-    attempts: number
-  }
+  // 登录限制相关
+  attemptsRemaining?: number
+  remainingSeconds?: number
+  lockType?: 'ip' | 'username'
 }
 
 export const authAPI = {

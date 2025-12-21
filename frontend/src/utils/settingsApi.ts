@@ -1,6 +1,4 @@
-import { getAuthToken } from './auth'
-
-const API_BASE = import.meta.env.VITE_API_URL || ''
+import api from './api'
 
 export interface UserSettings {
   website_name: string
@@ -12,22 +10,6 @@ export interface UserSettings {
   items_per_page: number
   show_icons: boolean
   auto_save: boolean
-}
-
-// 公开获取网站基本设置（不需要认证，用于登录页面）
-export async function getPublicSettings(): Promise<{ website_name: string; logo_url: string }> {
-  const response = await fetch(`${API_BASE}/api/settings/public`, {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
-
-  if (!response.ok) {
-    // 如果公开端点不存在，返回默认值
-    return { website_name: 'qiankui导航', logo_url: '' }
-  }
-
-  return response.json()
 }
 
 export interface ExportData {
@@ -84,176 +66,70 @@ export interface ExportStats {
   links: number
   notes: number
   clipboard_items: number
-  export_size: number
+  export_size?: number
+}
+
+// 公开获取网站基本设置（不需要认证，用于登录页面）
+export async function getPublicSettings(): Promise<{ website_name: string; logo_url: string }> {
+  try {
+    const response = await api.get('/api/settings/public')
+    return response.data
+  } catch {
+    return { website_name: 'qiankui导航', logo_url: '' }
+  }
 }
 
 // Get user settings
 export async function getUserSettings(): Promise<UserSettings> {
-  const token = getAuthToken()
-  if (!token) {
-    throw new Error('No authentication token')
-  }
-
-  const response = await fetch(`${API_BASE}/api/settings`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to get settings')
-  }
-
-  return response.json()
+  const response = await api.get('/api/settings')
+  return response.data?.data || response.data
 }
 
 // Update user settings
 export async function updateUserSettings(settings: Partial<UserSettings>): Promise<UserSettings> {
-  const token = getAuthToken()
-  if (!token) {
-    throw new Error('No authentication token')
-  }
-
-  const response = await fetch(`${API_BASE}/api/settings`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(settings)
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to update settings')
-  }
-
-  return response.json()
+  const response = await api.put('/api/settings', settings)
+  return response.data?.data || response.data
 }
 
 // Export user data
 export async function exportUserData(): Promise<ExportData> {
-  const token = getAuthToken()
-  if (!token) {
-    throw new Error('No authentication token')
-  }
-
-  const response = await fetch(`${API_BASE}/api/settings/export`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to export data')
-  }
-
-  return response.json()
+  const response = await api.get('/api/settings/export')
+  return response.data?.data || response.data
 }
 
 // Import user data
 export async function importUserData(data: ExportData): Promise<ImportResult> {
-  const token = getAuthToken()
-  if (!token) {
-    throw new Error('No authentication token')
-  }
-
-  const response = await fetch(`${API_BASE}/api/settings/import`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data)
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to import data')
-  }
-
-  return response.json()
+  const response = await api.post('/api/settings/import', data)
+  return response.data
 }
 
 // Update user credentials
 export async function updateUserCredentials(
-  currentPassword: string, 
+  currentPassword: string,
   newPassword?: string,
   newUsername?: string
 ): Promise<{ success: boolean; message: string; username?: string }> {
-  const token = getAuthToken()
-  if (!token) {
-    throw new Error('No authentication token')
-  }
-
-  const response = await fetch(`${API_BASE}/api/settings/credentials`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      currentPassword,
-      newPassword,
-      newUsername
-    })
+  const response = await api.put('/api/settings/credentials', {
+    currentPassword,
+    newPassword,
+    newUsername,
   })
-
-  const data = await response.json()
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to update credentials')
-  }
-  
-  return data
+  return response.data
 }
 
 // Get export statistics
 export async function getExportStats(): Promise<ExportStats> {
-  const token = getAuthToken()
-  if (!token) {
-    throw new Error('No authentication token')
-  }
-
-  const response = await fetch(`${API_BASE}/api/settings/export/stats`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to get export stats')
-  }
-
-  return response.json()
+  const response = await api.get('/api/settings/export/stats')
+  return response.data?.data || response.data
 }
 
 // Download export data as file
 export async function downloadExportData(): Promise<void> {
-  const token = getAuthToken()
-  if (!token) {
-    throw new Error('No authentication token')
-  }
-
-  const response = await fetch(`${API_BASE}/api/settings/export`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
+  const response = await api.get('/api/settings/export', {
+    responseType: 'blob',
   })
 
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to export data')
-  }
-
-  // Create download
-  const blob = await response.blob()
+  const blob = new Blob([JSON.stringify(response.data)], { type: 'application/json' })
   const url = window.URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

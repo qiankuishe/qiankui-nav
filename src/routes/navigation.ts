@@ -8,7 +8,7 @@ export async function navigationRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = getAuthUser(request)
     if (!user) {
-      return reply.status(401).send({ error: '未登录' })
+      return reply.status(401).send({ success: false, error: '未登录' })
     }
     ;(request as any).user = user
   })
@@ -57,7 +57,7 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     const { name, order = 0 } = request.body as { name: string; order?: number }
     
     if (!name) {
-      return reply.status(400).send({ error: '分类名称不能为空' })
+      return reply.status(400).send({ success: false, error: '分类名称不能为空' })
     }
 
     const db = getDb()
@@ -67,7 +67,7 @@ export async function navigationRoutes(fastify: FastifyInstance) {
       INSERT INTO categories (id, user_id, name, "order") VALUES (?, ?, ?, ?)
     `).run(id, userId, name, order)
 
-    return { id, name, order, links: [] }
+    return { success: true, data: { id, name, order, links: [] } }
   })
 
   // 更新分类
@@ -84,7 +84,7 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     if (order !== undefined) { updates.push('"order" = ?'); values.push(order) }
     
     if (updates.length === 0) {
-      return reply.status(400).send({ error: '没有要更新的内容' })
+      return reply.status(400).send({ success: false, error: '没有要更新的内容' })
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP')
@@ -130,7 +130,7 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     const { categoryId, title, url, description, order = 0 } = request.body as any
     
     if (!categoryId || !title || !url) {
-      return reply.status(400).send({ error: '分类、标题、链接不能为空' })
+      return reply.status(400).send({ success: false, error: '分类、标题、链接不能为空' })
     }
 
     const db = getDb()
@@ -138,7 +138,7 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     // 验证分类是否存在且属于当前用户
     const category = db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?').get(categoryId, userId)
     if (!category) {
-      return reply.status(400).send({ error: '分类不存在，请先创建分类' })
+      return reply.status(400).send({ success: false, error: '分类不存在，请先创建分类' })
     }
     
     const id = uuidv4()
@@ -148,7 +148,7 @@ export async function navigationRoutes(fastify: FastifyInstance) {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, userId, categoryId, title, url, description || null, order)
 
-    return { id, categoryId, title, url, description, order }
+    return { success: true, data: { id, categoryId, title, url, description, order } }
   })
 
   // 更新链接
@@ -168,7 +168,7 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     if (categoryId !== undefined) { updates.push('category_id = ?'); values.push(categoryId) }
     
     if (updates.length === 0) {
-      return reply.status(400).send({ error: '没有要更新的内容' })
+      return reply.status(400).send({ success: false, error: '没有要更新的内容' })
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP')
@@ -218,5 +218,16 @@ export async function navigationRoutes(fastify: FastifyInstance) {
 
     const link = db.prepare('SELECT * FROM links WHERE id = ? AND user_id = ?').get(linkId, userId)
     return { success: true, data: link }
+  })
+
+  // 批量删除所有导航数据（分类和链接）
+  fastify.delete('/all', async (request: FastifyRequest) => {
+    const userId = (request as any).user.userId
+    const db = getDb()
+    
+    db.prepare('DELETE FROM links WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM categories WHERE user_id = ?').run(userId)
+
+    return { success: true }
   })
 }
