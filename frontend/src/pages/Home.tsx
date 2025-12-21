@@ -609,7 +609,8 @@ export default function Home() {
 
   if (loading) return (
     <div className="min-h-screen bg-bg-main flex">
-      <div className="w-60 bg-bg-card border-r border-border-main p-4">
+      {/* 侧边栏骨架 - 只在桌面端显示 */}
+      <div className="hidden lg:block w-60 bg-bg-card border-r border-border-main p-4">
         {[1,2,3,4].map(i => <div key={i} className="h-10 bg-hover-bg rounded-lg animate-pulse mb-2" />)}
       </div>
       <div className="flex-1 p-6"><LoadingGrid ItemComponent={LinkCardSkeleton} /></div>
