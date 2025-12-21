@@ -32,7 +32,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; id: string; title: string }>({ isOpen: false, id: '', title: '' })
   const [addMenuOpen, setAddMenuOpen] = useState(false)
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [localHighlightId, setLocalHighlightId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -66,8 +66,11 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   }
 
   const saveItem = async (item: ClipboardItem) => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-    saveTimeoutRef.current = setTimeout(async () => {
+    // 每个项目独立的防抖
+    const existingTimeout = saveTimeoutsRef.current.get(item.id)
+    if (existingTimeout) clearTimeout(existingTimeout)
+    
+    const timeout = setTimeout(async () => {
       try {
         await api.put(`/api/clipboard/items/${item.id}`, {
           type: item.type,
@@ -78,7 +81,10 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
       } catch (err) {
         console.error('Error saving item:', err)
       }
+      saveTimeoutsRef.current.delete(item.id)
     }, 800)
+    
+    saveTimeoutsRef.current.set(item.id, timeout)
   }
 
   const addItem = async (type: 'text' | 'code' | 'image') => {
@@ -95,6 +101,15 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   }
 
   const updateItem = (id: string, updates: Partial<ClipboardItem>) => {
+    // 检查公开便签上限
+    if (updates.is_public === 1) {
+      const publicCount = items.filter(i => i.is_public === 1 && i.id !== id).length
+      if (publicCount >= 16) {
+        showNotification('error', '公开便签已达上限（最多16个）')
+        return
+      }
+    }
+
     const newItems = items.map(item => 
       item.id === id ? { ...item, ...updates, updated_at: new Date().toISOString() } : item
     )

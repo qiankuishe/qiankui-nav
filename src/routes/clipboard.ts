@@ -12,7 +12,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
       FROM clipboard_items 
       WHERE is_public = 1 
       ORDER BY updated_at DESC 
-      LIMIT 8
+      LIMIT 16
     `).all()
     return { success: true, data: items }
   })

@@ -18,26 +18,37 @@ const COLORS = [
   { bg: 'bg-orange-100', border: 'border-orange-200', text: 'text-orange-800' },
 ]
 
-// 生成随机位置（避开中心登录框）
+// 生成随机位置（更自由的分布，允许部分遮挡登录框）
 function generatePositions(count: number) {
-  const positions: { x: number; y: number; rotation: number }[] = []
-  const centerX = 50, centerY = 50
-  const safeZone = { width: 30, height: 45 } // 登录框占据的区域百分比
+  const positions: { x: number; y: number; rotation: number; zIndex: number }[] = []
+  
+  // 定义多个区域，包括可以部分遮挡登录框的边缘区域
+  const zones = [
+    // 四角区域
+    { xMin: -5, xMax: 25, yMin: -5, yMax: 25 },   // 左上
+    { xMin: 75, xMax: 105, yMin: -5, yMax: 25 },  // 右上
+    { xMin: -5, xMax: 25, yMin: 75, yMax: 105 },  // 左下
+    { xMin: 75, xMax: 105, yMin: 75, yMax: 105 }, // 右下
+    // 边缘区域（可以部分藏到登录框下面）
+    { xMin: 25, xMax: 40, yMin: 10, yMax: 90 },   // 左侧边缘
+    { xMin: 60, xMax: 75, yMin: 10, yMax: 90 },   // 右侧边缘
+    { xMin: 20, xMax: 80, yMin: -5, yMax: 20 },   // 顶部
+    { xMin: 20, xMax: 80, yMin: 80, yMax: 105 },  // 底部
+  ]
   
   for (let i = 0; i < count; i++) {
-    let x, y, attempts = 0
-    do {
-      x = 5 + Math.random() * 85
-      y = 5 + Math.random() * 85
-      attempts++
-    } while (
-      attempts < 50 &&
-      Math.abs(x - centerX) < safeZone.width &&
-      Math.abs(y - centerY) < safeZone.height
-    )
+    const zone = zones[i % zones.length]
+    const x = zone.xMin + Math.random() * (zone.xMax - zone.xMin)
+    const y = zone.yMin + Math.random() * (zone.yMax - zone.yMin)
+    
+    // 靠近中心的便签 z-index 更低（藏在登录框下面）
+    const distFromCenter = Math.sqrt(Math.pow(x - 50, 2) + Math.pow(y - 50, 2))
+    const zIndex = distFromCenter < 25 ? 5 : 20
+    
     positions.push({
       x, y,
-      rotation: -6 + Math.random() * 12
+      rotation: -8 + Math.random() * 16,
+      zIndex
     })
   }
   return positions
@@ -66,7 +77,7 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
     const positions = generatePositions(stickers.length)
     return stickers.map((_, i) => ({
       color: COLORS[i % COLORS.length],
-      position: positions[i] || { x: 10, y: 10, rotation: 0 }
+      position: positions[i] || { x: 10, y: 10, rotation: 0, zIndex: 20 }
     }))
   }, [stickers.length])
 
@@ -98,11 +109,12 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
           return (
             <div
               key={sticker.id}
-              className={`absolute w-40 pointer-events-auto cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-xl ${style.color.bg} ${style.color.border} border rounded-lg shadow-md`}
+              className={`absolute w-40 pointer-events-auto cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-xl hover:!z-50 ${style.color.bg} ${style.color.border} border rounded-lg shadow-md`}
               style={{
                 left: `${style.position.x}%`,
                 top: `${style.position.y}%`,
                 transform: `translate(-50%, -50%) rotate(${style.position.rotation}deg)`,
+                zIndex: style.position.zIndex,
               }}
               onClick={() => setSelectedSticker(sticker)}
             >
