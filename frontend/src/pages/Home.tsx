@@ -764,7 +764,7 @@ export default function Home() {
                 <button onClick={toggleDarkMode} className="w-8 h-8 rounded-lg bg-hover-bg flex items-center justify-center hover:bg-border-main" title={isDarkMode ? '切换到浅色模式' : '切换到深色模式'}>
                   {isDarkMode ? <SunIcon className="w-4 h-4 text-text-secondary" /> : <MoonIcon className="w-4 h-4 text-text-secondary" />}
                 </button>
-                <button onClick={() => setActiveTab('settings')} className="w-8 h-8 rounded-lg bg-hover-bg flex items-center justify-center hover:bg-border-main" title="设置">
+                <button onClick={() => { setActiveTab('settings'); setSidebarOpen(false) }} className="w-8 h-8 rounded-lg bg-hover-bg flex items-center justify-center hover:bg-border-main" title="设置">
                   <Cog6ToothIcon className="w-4 h-4 text-text-secondary" />
                 </button>
               </div>
@@ -786,7 +786,7 @@ export default function Home() {
                     <DocumentTextIcon className="w-4 h-4" />笔记
                   </button>
                   <button onClick={() => setActiveTab('clipboard')} className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1.5 ${activeTab === 'clipboard' ? 'bg-bg-card text-text-main shadow-sm font-medium' : 'text-text-secondary hover:text-text-main'}`}>
-                    <ClipboardDocumentListIcon className="w-4 h-4" />剪贴板
+                    <ClipboardDocumentListIcon className="w-4 h-4" />便签
                   </button>
                 </div>
               </div>

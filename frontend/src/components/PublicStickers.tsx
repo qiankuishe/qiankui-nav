@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { XMarkIcon, DocumentDuplicateIcon, CodeBracketIcon, PhotoIcon, DocumentTextIcon, ChevronLeftIcon } from '@heroicons/react/24/outline'
 
 interface Sticker {
@@ -62,6 +62,8 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
   const [stickers, setStickers] = useState<Sticker[]>([])
   const [selectedSticker, setSelectedSticker] = useState<Sticker | null>(null)
   const [copied, setCopied] = useState(false)
+  // 30% 概率显示跑出来的便签
+  const showEscapedSticker = useRef(Math.random() < 0.3)
 
   useEffect(() => {
     fetch('/api/clipboard/public/stickers')
@@ -157,6 +159,25 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
           </div>
         )}
       </div>
+
+      {/* 移动端：30%概率跑出来的便签 */}
+      {showEscapedSticker.current && stickers.length > 0 && (() => {
+        const sticker = stickers[0]
+        const color = COLORS[0]
+        return (
+          <div
+            className="md:hidden fixed left-1/2 -translate-x-1/2 cursor-pointer z-10 animate-wiggle"
+            style={{ bottom: '35%' }}
+            onClick={onShowMobileList}
+          >
+            <div className={`${color.bg} ${color.border} border rounded-lg px-3 py-2 shadow-lg`}>
+              <span className={`text-xs font-medium ${color.text} truncate block max-w-20`}>
+                {sticker.title || '便签'}
+              </span>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* 详情弹窗 */}
       {selectedSticker && (

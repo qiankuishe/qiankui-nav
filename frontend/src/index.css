@@ -69,3 +69,14 @@ body {
   width: 100%;
   min-height: 100vh;
 }
+
+
+/* 便签微微晃动动画 */
+@keyframes wiggle {
+  0%, 100% { transform: translateX(-50%) rotate(-2deg); }
+  50% { transform: translateX(-50%) rotate(2deg); }
+}
+
+.animate-wiggle {
+  animation: wiggle 2s ease-in-out infinite;
+}

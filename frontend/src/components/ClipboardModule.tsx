@@ -7,7 +7,7 @@ import {
   DocumentDuplicateIcon,
   TrashIcon,
   PlusIcon,
-  GlobeAltIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline'
 import ConfirmModal from './ConfirmModal'
 import api from '../utils/api'
@@ -217,7 +217,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
 
       {/* 标题栏 */}
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-lg font-semibold text-text-main">剪贴板 ({items.length})</h2>
+        <h2 className="text-lg font-semibold text-text-main">便签 ({items.length})</h2>
         <div className="relative">
           <button 
             onClick={() => setAddMenuOpen(!addMenuOpen)}
@@ -249,13 +249,13 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
       {items.length === 0 ? (
         <div className="bg-bg-card border border-border-main rounded-2xl p-12 text-center">
           <ClipboardDocumentListIcon className="w-16 h-16 mx-auto text-text-secondary/50 mb-4" />
-          <p className="text-text-secondary mb-6">暂无剪贴板项目</p>
+          <p className="text-text-secondary mb-6">暂无便签</p>
           <button 
             onClick={() => setAddMenuOpen(true)}
             className="px-5 py-2.5 bg-primary text-white rounded-xl hover:bg-primary-hover transition-all text-sm font-medium inline-flex items-center gap-2 shadow-sm"
           >
             <PlusIcon className="w-4 h-4" />
-            添加第一个项目
+            添加第一个便签
           </button>
         </div>
       ) : (
@@ -287,7 +287,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                       className={`p-1.5 sm:p-2 rounded-lg transition ${item.is_public ? 'text-green-500 bg-green-50 hover:bg-green-100' : 'text-text-secondary hover:bg-hover-bg'}`}
                       title={item.is_public ? '已公开（点击取消）' : '设为公开便签'}
                     >
-                      <GlobeAltIcon className="w-4 h-4" />
+                      <EyeIcon className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => copyItem(item)}
