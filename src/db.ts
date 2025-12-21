@@ -73,6 +73,7 @@ export async function initDatabase() {
       type TEXT NOT NULL DEFAULT 'text',
       title TEXT DEFAULT '',
       content TEXT DEFAULT '',
+      is_public INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -84,6 +85,13 @@ export async function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id);
     CREATE INDEX IF NOT EXISTS idx_clipboard_user ON clipboard_items(user_id);
   `)
+
+  // 数据库迁移：为已有表添加 is_public 字段
+  const columns = db.prepare("PRAGMA table_info(clipboard_items)").all() as { name: string }[]
+  if (!columns.some(c => c.name === 'is_public')) {
+    db.exec('ALTER TABLE clipboard_items ADD COLUMN is_public INTEGER DEFAULT 0')
+    console.log('✅ Added is_public column to clipboard_items')
+  }
 
   // 创建默认管理员账号和示例数据
   const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin')
@@ -257,11 +265,15 @@ export async function initDatabase() {
     db.prepare(`INSERT INTO notes (id, user_id, title, content) VALUES (?, ?, ?, ?)`)
       .run(uuidv4(), adminId, '欢迎使用qiankui导航', '这是一个示例笔记。\n\n您可以在这里记录重要信息、待办事项或任何想法。\n\n## 功能特点\n- 支持 Markdown 格式\n- 自动保存\n- 快速搜索')
     
-    // 示例剪贴板
-    db.prepare(`INSERT INTO clipboard_items (id, user_id, type, title, content) VALUES (?, ?, ?, ?, ?)`)
-      .run(uuidv4(), adminId, 'text', '示例文本', '这是一个示例剪贴板内容，您可以在这里保存常用的文本片段。')
-    db.prepare(`INSERT INTO clipboard_items (id, user_id, type, title, content) VALUES (?, ?, ?, ?, ?)`)
-      .run(uuidv4(), adminId, 'code', '示例代码', 'console.log("Hello, World!");')
+    // 示例剪贴板（含公开便签示例）
+    db.prepare(`INSERT INTO clipboard_items (id, user_id, type, title, content, is_public) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(uuidv4(), adminId, 'text', '示例文本', '这是一个示例剪贴板内容，您可以在这里保存常用的文本片段。', 0)
+    db.prepare(`INSERT INTO clipboard_items (id, user_id, type, title, content, is_public) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(uuidv4(), adminId, 'code', '示例代码', 'console.log("Hello, World!");', 0)
+    db.prepare(`INSERT INTO clipboard_items (id, user_id, type, title, content, is_public) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(uuidv4(), adminId, 'text', '欢迎访问', '这是一个公开便签，访客可以在登录页看到它！', 1)
+    db.prepare(`INSERT INTO clipboard_items (id, user_id, type, title, content, is_public) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(uuidv4(), adminId, 'code', 'Docker 部署', 'docker run -d -p 3001:3001 -v nav-data:/app/data qiankui-nav', 1)
     
     console.log('✅ Created default admin user (admin/admin123) with 12 categories and 72 links')
   }

@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { useAuth } from '../hooks/useAuth'
 import { getPublicSettings } from '../utils/settingsApi'
+import PublicStickers, { MobileStickerList } from '../components/PublicStickers'
 
 export default function Login() {
   const { login, isAuthenticated, isLoading } = useAuth()
@@ -15,6 +16,7 @@ export default function Login() {
   const [lockType, setLockType] = useState<'ip' | 'username' | null>(null)
   const [siteName, setSiteName] = useState('qiankui导航')
   const [logoUrl, setLogoUrl] = useState('')
+  const [showMobileStickers, setShowMobileStickers] = useState(false)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -127,12 +129,20 @@ export default function Login() {
 
   const isLocked = lockCountdown && lockCountdown > 0
 
+  // 移动端便签列表
+  if (showMobileStickers) {
+    return <MobileStickerList onClose={() => setShowMobileStickers(false)} />
+  }
+
   return (
     <div 
-      className="min-h-screen flex items-center justify-center py-12 px-4"
+      className="min-h-screen flex items-center justify-center py-12 px-4 relative"
       style={{ background: 'linear-gradient(135deg, var(--color-bg-main) 0%, var(--color-bg-card) 100%)' }}
     >
-      <div className="w-full max-w-[420px] bg-bg-card rounded-3xl border border-border-main shadow-xl overflow-hidden">
+      {/* 公开便签 */}
+      <PublicStickers onShowMobileList={() => setShowMobileStickers(true)} />
+
+      <div className="w-full max-w-[420px] bg-bg-card rounded-3xl border border-border-main shadow-xl overflow-hidden relative z-10">
         {/* Header */}
         <div 
           className="flex items-center gap-4 px-9 pt-8 pb-6"

@@ -4,8 +4,24 @@ import { getDb } from '../db.js'
 import { getAuthUser } from '../auth.js'
 
 export async function clipboardRoutes(fastify: FastifyInstance) {
-  // 认证中间件
+  // 公开 API：获取公开便签（无需认证）
+  fastify.get('/public/stickers', async () => {
+    const db = getDb()
+    const items = db.prepare(`
+      SELECT id, type, title, content, updated_at 
+      FROM clipboard_items 
+      WHERE is_public = 1 
+      ORDER BY updated_at DESC 
+      LIMIT 8
+    `).all()
+    return { success: true, data: items }
+  })
+
+  // 认证中间件（排除公开 API）
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
+    // 公开 API 不需要认证
+    if (request.url.includes('/public/')) return
+    
     const user = getAuthUser(request)
     if (!user) {
       return reply.status(401).send({ success: false, error: '未登录' })
@@ -51,7 +67,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
   // 创建剪贴板项目
   fastify.post('/items', async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = (request as any).user.userId
-    const { type, title, content } = request.body as { type?: string; title?: string; content?: string }
+    const { type, title, content, is_public } = request.body as { type?: string; title?: string; content?: string; is_public?: number }
     
     if (!type) {
       return reply.status(400).send({ success: false, error: '类型不能为空' })
@@ -67,8 +83,8 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     const id = uuidv4()
     
     db.prepare(`
-      INSERT INTO clipboard_items (id, user_id, type, title, content) VALUES (?, ?, ?, ?, ?)
-    `).run(id, userId, type, finalTitle, content || '')
+      INSERT INTO clipboard_items (id, user_id, type, title, content, is_public) VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, userId, type, finalTitle, content || '', is_public ? 1 : 0)
 
     const item = db.prepare('SELECT * FROM clipboard_items WHERE id = ?').get(id)
     return reply.status(201).send({ success: true, data: item })
@@ -78,7 +94,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
   fastify.put('/items/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = (request as any).user.userId
     const { id } = request.params as { id: string }
-    const { title, content } = request.body as { title?: string; content?: string }
+    const { title, content, is_public } = request.body as { title?: string; content?: string; is_public?: number }
     const db = getDb()
     
     const updates: string[] = []
@@ -86,6 +102,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     
     if (title !== undefined) { updates.push('title = ?'); values.push(title) }
     if (content !== undefined) { updates.push('content = ?'); values.push(content) }
+    if (is_public !== undefined) { updates.push('is_public = ?'); values.push(is_public ? 1 : 0) }
     
     if (updates.length === 0) {
       return reply.status(400).send({ success: false, error: '没有要更新的内容' })

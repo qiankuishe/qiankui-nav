@@ -7,6 +7,7 @@ import {
   DocumentDuplicateIcon,
   TrashIcon,
   PlusIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline'
 import ConfirmModal from './ConfirmModal'
 import api from '../utils/api'
@@ -17,6 +18,7 @@ interface ClipboardItem {
   type: 'text' | 'code' | 'image'
   title: string
   content: string
+  is_public: number
   updated_at: string
 }
 
@@ -71,6 +73,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
           type: item.type,
           title: item.title,
           content: item.content,
+          is_public: item.is_public,
         })
       } catch (err) {
         console.error('Error saving item:', err)
@@ -262,6 +265,13 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                     placeholder={typeInfo.label}
                     className="flex-1 min-w-0 text-base font-medium bg-transparent border-none outline-none text-primary placeholder-text-secondary"
                   />
+                  <button
+                    onClick={() => updateItem(item.id, { is_public: item.is_public ? 0 : 1 })}
+                    className={`p-2 rounded-lg transition ${item.is_public ? 'text-green-500 bg-green-50 hover:bg-green-100' : 'text-text-secondary hover:bg-hover-bg'}`}
+                    title={item.is_public ? '已公开（点击取消）' : '设为公开便签'}
+                  >
+                    <GlobeAltIcon className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => copyItem(item)}
                     className="p-2 text-primary hover:bg-primary/10 rounded-lg transition"
