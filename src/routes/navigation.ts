@@ -134,6 +134,13 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     }
 
     const db = getDb()
+    
+    // 验证分类是否存在且属于当前用户
+    const category = db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?').get(categoryId, userId)
+    if (!category) {
+      return reply.status(400).send({ error: '分类不存在，请先创建分类' })
+    }
+    
     const id = uuidv4()
     
     db.prepare(`
