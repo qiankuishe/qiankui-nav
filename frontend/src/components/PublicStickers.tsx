@@ -62,8 +62,9 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
   const [stickers, setStickers] = useState<Sticker[]>([])
   const [selectedSticker, setSelectedSticker] = useState<Sticker | null>(null)
   const [copied, setCopied] = useState(false)
-  // 30% 概率显示跑出来的便签
+  // 30% 概率显示跑出来的便签，随机选择一个便签索引
   const showEscapedSticker = useRef(Math.random() < 0.3)
+  const escapedStickerIndex = useRef(Math.floor(Math.random() * 100))
 
   useEffect(() => {
     fetch('/api/clipboard/public/stickers')
@@ -162,8 +163,9 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
 
       {/* 移动端：30%概率跑出来的便签 - 显示在登录框下方、底部标签栏上方 */}
       {showEscapedSticker.current && stickers.length > 0 && (() => {
-        const sticker = stickers[0]
-        const color = COLORS[0]
+        const randomIndex = escapedStickerIndex.current % stickers.length
+        const sticker = stickers[randomIndex]
+        const color = COLORS[randomIndex % COLORS.length]
         return (
           <div
             className="md:hidden fixed left-1/2 -translate-x-1/2 cursor-pointer z-10 animate-wiggle"
