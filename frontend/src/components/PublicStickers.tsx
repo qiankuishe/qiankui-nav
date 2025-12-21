@@ -161,15 +161,18 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
         )}
       </div>
 
-      {/* 移动端：30%概率跑出来的便签 - 显示在登录框下方、底部标签栏上方 */}
+      {/* 移动端：30%概率跑出来的便签 - 动态定位在登录框下方、底部标签栏上方 */}
       {showEscapedSticker.current && stickers.length > 0 && (() => {
         const randomIndex = escapedStickerIndex.current % stickers.length
         const sticker = stickers[randomIndex]
         const color = COLORS[randomIndex % COLORS.length]
         return (
           <div
-            className="md:hidden fixed left-1/2 -translate-x-1/2 cursor-pointer z-10 animate-wiggle"
-            style={{ bottom: '80px' }}
+            className="md:hidden fixed left-1/2 -translate-x-1/2 cursor-pointer z-5 animate-wiggle"
+            style={{ 
+              top: 'calc(50% + 220px)',  // 登录框中心往下220px
+              transform: 'translateX(-50%)'
+            }}
             onClick={onShowMobileList}
           >
             <div 
