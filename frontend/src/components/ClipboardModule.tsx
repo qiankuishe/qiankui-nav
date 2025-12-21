@@ -9,6 +9,7 @@ import {
   PlusIcon,
   GlobeAltIcon,
 } from '@heroicons/react/24/outline'
+import { MapPinIcon } from '@heroicons/react/24/solid'
 import ConfirmModal from './ConfirmModal'
 import api from '../utils/api'
 import { useEventListener } from '../hooks/useEventListener'
@@ -19,6 +20,7 @@ interface ClipboardItem {
   title: string
   content: string
   is_public: number
+  is_pinned: number
   updated_at: string
 }
 
@@ -77,6 +79,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
           title: item.title,
           content: item.content,
           is_public: item.is_public,
+          is_pinned: item.is_pinned,
         })
       } catch (err) {
         console.error('Error saving item:', err)
@@ -110,9 +113,18 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
       }
     }
 
-    const newItems = items.map(item => 
+    let newItems = items.map(item => 
       item.id === id ? { ...item, ...updates, updated_at: new Date().toISOString() } : item
     )
+    
+    // 如果是置顶状态变化，重新排序
+    if (updates.is_pinned !== undefined) {
+      newItems = [...newItems].sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return b.is_pinned - a.is_pinned
+        return 0 // 保持原有顺序
+      })
+    }
+    
     setItems(newItems)
     const updated = newItems.find(i => i.id === id)
     if (updated) saveItem(updated)
@@ -269,7 +281,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                 className={`bg-bg-card border border-border-main rounded-2xl overflow-hidden shadow-sm transition-all duration-300 ${localHighlightId === item.id ? 'search-highlight' : ''}`}
               >
                 {/* 头部 */}
-                <div className="p-4 flex items-center gap-3">
+                <div className="p-4 flex items-center gap-2 sm:gap-3">
                   <span className={`w-8 h-8 rounded-lg bg-hover-bg flex items-center justify-center flex-shrink-0 ${typeInfo.color}`}>
                     <TypeIcon className="w-4 h-4" />
                   </span>
@@ -280,27 +292,36 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                     placeholder={typeInfo.label}
                     className="flex-1 min-w-0 text-base font-medium bg-transparent border-none outline-none text-primary placeholder-text-secondary"
                   />
-                  <button
-                    onClick={() => updateItem(item.id, { is_public: item.is_public ? 0 : 1 })}
-                    className={`p-2 rounded-lg transition ${item.is_public ? 'text-green-500 bg-green-50 hover:bg-green-100' : 'text-text-secondary hover:bg-hover-bg'}`}
-                    title={item.is_public ? '已公开（点击取消）' : '设为公开便签'}
-                  >
-                    <GlobeAltIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => copyItem(item)}
-                    className="p-2 text-primary hover:bg-primary/10 rounded-lg transition"
-                    title="复制"
-                  >
-                    <DocumentDuplicateIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteConfirm({ isOpen: true, id: item.id, title: item.title })}
-                    className="p-2 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                    title="删除"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => updateItem(item.id, { is_pinned: item.is_pinned ? 0 : 1 })}
+                      className={`p-1.5 sm:p-2 rounded-lg transition ${item.is_pinned ? 'text-amber-500 bg-amber-50 hover:bg-amber-100' : 'text-text-secondary hover:bg-hover-bg'}`}
+                      title={item.is_pinned ? '取消置顶' : '置顶'}
+                    >
+                      <MapPinIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => updateItem(item.id, { is_public: item.is_public ? 0 : 1 })}
+                      className={`p-1.5 sm:p-2 rounded-lg transition ${item.is_public ? 'text-green-500 bg-green-50 hover:bg-green-100' : 'text-text-secondary hover:bg-hover-bg'}`}
+                      title={item.is_public ? '已公开（点击取消）' : '设为公开便签'}
+                    >
+                      <GlobeAltIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => copyItem(item)}
+                      className="p-1.5 sm:p-2 text-primary hover:bg-primary/10 rounded-lg transition"
+                      title="复制"
+                    >
+                      <DocumentDuplicateIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm({ isOpen: true, id: item.id, title: item.title })}
+                      className="p-1.5 sm:p-2 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                      title="删除"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* 内容区 */}

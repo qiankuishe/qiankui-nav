@@ -5,6 +5,7 @@ export interface Note {
   user_id: string
   title: string
   content: string
+  is_pinned: number
   created_at: string
   updated_at: string
 }
@@ -17,6 +18,7 @@ export interface CreateNoteRequest {
 export interface UpdateNoteRequest {
   title?: string
   content?: string
+  is_pinned?: number
 }
 
 // Get all notes

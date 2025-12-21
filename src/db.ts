@@ -62,6 +62,7 @@ export async function initDatabase() {
       user_id TEXT NOT NULL,
       title TEXT NOT NULL,
       content TEXT DEFAULT '',
+      is_pinned INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -74,6 +75,7 @@ export async function initDatabase() {
       title TEXT DEFAULT '',
       content TEXT DEFAULT '',
       is_public INTEGER DEFAULT 0,
+      is_pinned INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -91,6 +93,17 @@ export async function initDatabase() {
   if (!columns.some(c => c.name === 'is_public')) {
     db.exec('ALTER TABLE clipboard_items ADD COLUMN is_public INTEGER DEFAULT 0')
     console.log('✅ Added is_public column to clipboard_items')
+  }
+  if (!columns.some(c => c.name === 'is_pinned')) {
+    db.exec('ALTER TABLE clipboard_items ADD COLUMN is_pinned INTEGER DEFAULT 0')
+    console.log('✅ Added is_pinned column to clipboard_items')
+  }
+
+  // 数据库迁移：为 notes 表添加 is_pinned 字段
+  const noteColumns = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[]
+  if (!noteColumns.some(c => c.name === 'is_pinned')) {
+    db.exec('ALTER TABLE notes ADD COLUMN is_pinned INTEGER DEFAULT 0')
+    console.log('✅ Added is_pinned column to notes')
   }
 
   // 创建默认管理员账号和示例数据

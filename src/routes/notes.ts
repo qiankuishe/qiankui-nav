@@ -19,7 +19,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
     const db = getDb()
     
     const notes = db.prepare(`
-      SELECT * FROM notes WHERE user_id = ? ORDER BY updated_at DESC
+      SELECT * FROM notes WHERE user_id = ? ORDER BY is_pinned DESC, created_at DESC
     `).all(userId)
 
     return { success: true, data: notes }
@@ -59,7 +59,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
   fastify.put('/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = (request as any).user.userId
     const { id } = request.params as { id: string }
-    const { title, content } = request.body as { title?: string; content?: string }
+    const { title, content, is_pinned } = request.body as { title?: string; content?: string; is_pinned?: number }
     const db = getDb()
     
     const updates: string[] = []
@@ -67,6 +67,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
     
     if (title !== undefined) { updates.push('title = ?'); values.push(title) }
     if (content !== undefined) { updates.push('content = ?'); values.push(content) }
+    if (is_pinned !== undefined) { updates.push('is_pinned = ?'); values.push(is_pinned) }
     
     if (updates.length === 0) {
       return reply.status(400).send({ success: false, error: '没有要更新的内容' })

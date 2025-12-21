@@ -5,6 +5,7 @@ import {
   TrashIcon,
   ChevronLeftIcon,
 } from '@heroicons/react/24/outline'
+import { MapPinIcon } from '@heroicons/react/24/solid'
 import {
   Note,
   getNotes,
@@ -174,6 +175,28 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     }
   }
 
+  const handleTogglePin = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    if (!selectedNote) return
+    
+    try {
+      const newPinned = selectedNote.is_pinned ? 0 : 1
+      const updated = await updateNote(selectedNote.id, { is_pinned: newPinned })
+      setSelectedNote(updated)
+      // 重新排序列表
+      let newNotes = notes.map(n => n.id === updated.id ? updated : n)
+      newNotes = [...newNotes].sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return b.is_pinned - a.is_pinned
+        return 0
+      })
+      setNotes(newNotes)
+      showNotification('success', newPinned ? '已置顶' : '已取消置顶')
+    } catch (err) {
+      console.error('Error toggling pin:', err)
+      showNotification('error', '操作失败')
+    }
+  }
+
   const handleDeleteNote = (noteId: string, noteTitle: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
     setDeleteConfirm({ isOpen: true, noteId, noteTitle })
@@ -274,13 +297,24 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
           </button>
         )}
         {selectedNote && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {saving && (
               <span className="text-xs text-text-secondary flex items-center gap-1.5">
                 <SavingSpinner />
                 保存中...
               </span>
             )}
+            <button 
+              onClick={handleTogglePin}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
+                selectedNote.is_pinned 
+                  ? 'text-amber-500 bg-amber-50 hover:bg-amber-100' 
+                  : 'text-text-secondary hover:bg-hover-bg'
+              }`}
+            >
+              <MapPinIcon className="w-4 h-4" />
+              {selectedNote.is_pinned ? '已置顶' : '置顶'}
+            </button>
             <button 
               onClick={() => handleDeleteNote(selectedNote.id, selectedNote.title)}
               className="px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1.5"
@@ -347,7 +381,8 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-primary truncate mb-1">
+                    <h3 className="font-medium text-primary truncate mb-1 flex items-center gap-1.5">
+                      {note.is_pinned === 1 && <MapPinIcon className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
                       {note.title || '无标题'}
                     </h3>
                     <p className="text-sm text-text-secondary line-clamp-2">
