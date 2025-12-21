@@ -43,12 +43,12 @@ COPY --from=frontend-builder /app/frontend/dist ./public
 # 创建数据目录
 RUN mkdir -p /app/data
 
-EXPOSE 3000
+EXPOSE 3001
 
 VOLUME ["/app/data"]
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3001
 ENV DATABASE_PATH=/app/data/navigation.db
 
 CMD ["node", "dist/server.js"]

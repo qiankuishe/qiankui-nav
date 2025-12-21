@@ -15,7 +15,7 @@
 ```bash
 docker run -d \
   --name qiankui-nav \
-  -p 3000:3000 \
+  -p 3001:3001 \
   -v qiankui-data:/app/data \
   ghcr.io/qiankuishe/qiankui-nav:latest
 ```
@@ -27,7 +27,7 @@ services:
   qiankui-nav:
     image: ghcr.io/qiankuishe/qiankui-nav:latest
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - qiankui-data:/app/data
     restart: unless-stopped
@@ -47,7 +47,7 @@ volumes:
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `PORT` | 端口 | 3000 |
+| `PORT` | 端口 | 3001 |
 | `JWT_SECRET` | JWT 密钥 | 随机生成 |
 
 ## License
