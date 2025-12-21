@@ -43,7 +43,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
       params.push(type)
     }
     
-    sql += ' ORDER BY is_pinned DESC, created_at DESC'
+    sql += ' ORDER BY created_at DESC'
     const items = db.prepare(sql).all(...params)
 
     return { success: true, data: items }
@@ -94,7 +94,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
   fastify.put('/items/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = (request as any).user.userId
     const { id } = request.params as { id: string }
-    const { title, content, is_public, is_pinned } = request.body as { title?: string; content?: string; is_public?: number; is_pinned?: number }
+    const { title, content, is_public } = request.body as { title?: string; content?: string; is_public?: number }
     const db = getDb()
     
     const updates: string[] = []
@@ -103,7 +103,6 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     if (title !== undefined) { updates.push('title = ?'); values.push(title) }
     if (content !== undefined) { updates.push('content = ?'); values.push(content) }
     if (is_public !== undefined) { updates.push('is_public = ?'); values.push(is_public ? 1 : 0) }
-    if (is_pinned !== undefined) { updates.push('is_pinned = ?'); values.push(is_pinned ? 1 : 0) }
     
     if (updates.length === 0) {
       return reply.status(400).send({ success: false, error: '没有要更新的内容' })
@@ -158,7 +157,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
       params.push(type)
     }
     
-    sql += ' ORDER BY is_pinned DESC, created_at DESC'
+    sql += ' ORDER BY created_at DESC'
     const items = db.prepare(sql).all(...params)
 
     return { success: true, data: items }
