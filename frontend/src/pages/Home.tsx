@@ -69,7 +69,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<ActiveTab>('nav')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // 手机端默认关闭侧边栏，桌面端默认打开
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchEngine, setSearchEngine] = useState<keyof typeof searchEngines>('google')
   const [localSearchResults, setLocalSearchResults] = useState<Array<{ type: 'link' | 'note' | 'clipboard'; id: string; title: string; url?: string; desc: string }>>([])
