@@ -56,7 +56,7 @@ export default function LinkCard({ link, isEditMode, onEdit, onDelete }: LinkCar
       style={style} 
       {...attributes}
       {...(isEditMode ? listeners : {})}
-      className={`${isDragging ? 'opacity-40 z-50' : ''} ${isOver ? 'scale-95' : ''} transition-all duration-200`}
+      className={`${isDragging ? 'opacity-40 z-50' : ''} ${isOver ? 'scale-95' : ''} ${isEditMode ? 'select-none' : ''} transition-all duration-200`}
     >
       <div
         className={`group relative bg-bg-card border rounded-xl p-3 transition-all duration-200 ${
