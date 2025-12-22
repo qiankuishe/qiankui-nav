@@ -1,8 +1,22 @@
 # qiankui-nav
 
-个人导航页，集成书签、笔记、剪贴板管理。
+个人导航页，集成书签管理、笔记、剪贴板和公开便签功能。
+
+## 功能特性
+
+- 📚 **导航书签** - 分类管理网站链接，支持拖拽排序
+- 📝 **笔记管理** - 支持置顶、Markdown 预览
+- 📋 **剪贴板** - 保存文本、代码片段、图片，支持公开分享
+- 🏷️ **公开便签** - 登录页展示公开便签，访客可查看
+- 🔍 **站内搜索** - 快速搜索导航、笔记、剪贴板内容
+- 🌙 **深色模式** - 支持明暗主题切换
+- 📱 **响应式设计** - 适配桌面和移动端
+- 🔐 **安全认证** - JWT 认证 + 登录限流保护
+- 💾 **数据导入导出** - 支持 JSON 格式备份恢复
 
 ## 部署
+
+### Docker 运行
 
 ```bash
 docker run -d \
@@ -13,7 +27,7 @@ docker run -d \
   ghcr.io/qiankuishe/qiankui-nav:latest
 ```
 
-Docker Compose:
+### Docker Compose
 
 ```yaml
 services:
@@ -36,26 +50,50 @@ volumes:
 | 环境变量 | 说明 | 默认值 |
 |---------|------|--------|
 | `PORT` | 服务端口 | 3001 |
-| `JWT_SECRET` | JWT 签名密钥 | 随机生成 |
+| `JWT_SECRET` | JWT 签名密钥 | 随机生成（生产环境必须设置） |
 | `CORS_ORIGINS` | 允许跨域来源（逗号分隔） | * |
 
 ## 默认账号
 
 `admin` / `admin123`
 
-⚠️ 首次登录后请修改密码
+⚠️ 首次登录后请在设置中修改密码
 
-## 安全
+## 项目结构
 
-- 生产环境必须设置 `JWT_SECRET`
-- 建议通过反向代理配置 HTTPS
+```
+├── src/                    # 后端源码
+│   ├── server.ts          # Fastify 服务入口
+│   ├── db.ts              # SQLite 数据库
+│   ├── auth.ts            # JWT 认证
+│   └── routes/            # API 路由
+│       ├── auth.ts        # 登录/注册
+│       ├── navigation.ts  # 导航管理
+│       ├── notes.ts       # 笔记管理
+│       ├── clipboard.ts   # 剪贴板管理
+│       └── settings.ts    # 用户设置
+├── frontend/              # 前端源码
+│   └── src/
+│       ├── pages/         # 页面组件
+│       ├── components/    # UI 组件
+│       ├── hooks/         # React Hooks
+│       └── utils/         # 工具函数
+├── Dockerfile             # Docker 构建
+└── docker-compose.yml     # Compose 配置
+```
+
+## 安全建议
+
+- 生产环境必须设置 `JWT_SECRET` 环境变量
+- 建议通过反向代理（Nginx/Caddy）配置 HTTPS
 - 定期备份 `/app/data` 目录
+- 登录失败有 IP 和账号双重限流保护
 
 ## 技术栈
 
-- 前端: React + TypeScript + Tailwind CSS + dnd-kit
-- 后端: Fastify + better-sqlite3
-- 部署: Docker 单镜像
+- **前端**: React 18 + TypeScript + Tailwind CSS + Vite
+- **后端**: Fastify + better-sqlite3
+- **部署**: Docker 单镜像，数据持久化到 SQLite
 
 ## License
 

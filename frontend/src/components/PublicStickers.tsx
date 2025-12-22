@@ -1,5 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { XMarkIcon, DocumentDuplicateIcon, CodeBracketIcon, PhotoIcon, DocumentTextIcon, ChevronLeftIcon } from '@heroicons/react/24/outline'
+import {
+  XMarkIcon,
+  DocumentDuplicateIcon,
+  CodeBracketIcon,
+  PhotoIcon,
+  DocumentTextIcon,
+  ChevronLeftIcon,
+} from '@heroicons/react/24/outline'
 
 interface Sticker {
   id: string
@@ -18,37 +25,42 @@ const COLORS = [
   { bg: 'bg-orange-100', border: 'border-orange-200', text: 'text-orange-800' },
 ]
 
-// 生成随机位置（更自由的分布，允许部分遮挡登录框）
+// 共用的图标获取函数
+function getTypeIcon(type: string) {
+  switch (type) {
+    case 'code':
+      return CodeBracketIcon
+    case 'image':
+      return PhotoIcon
+    default:
+      return DocumentTextIcon
+  }
+}
+
+// 生成随机位置
 function generatePositions(count: number) {
   const positions: { x: number; y: number; rotation: number; zIndex: number }[] = []
-  
-  // 定义多个区域，包括可以部分遮挡登录框的边缘区域
   const zones = [
-    // 四角区域
-    { xMin: -5, xMax: 25, yMin: -5, yMax: 25 },   // 左上
-    { xMin: 75, xMax: 105, yMin: -5, yMax: 25 },  // 右上
-    { xMin: -5, xMax: 25, yMin: 75, yMax: 105 },  // 左下
-    { xMin: 75, xMax: 105, yMin: 75, yMax: 105 }, // 右下
-    // 边缘区域（可以部分藏到登录框下面）
-    { xMin: 25, xMax: 40, yMin: 10, yMax: 90 },   // 左侧边缘
-    { xMin: 60, xMax: 75, yMin: 10, yMax: 90 },   // 右侧边缘
-    { xMin: 20, xMax: 80, yMin: -5, yMax: 20 },   // 顶部
-    { xMin: 20, xMax: 80, yMin: 80, yMax: 105 },  // 底部
+    { xMin: -5, xMax: 25, yMin: -5, yMax: 25 },
+    { xMin: 75, xMax: 105, yMin: -5, yMax: 25 },
+    { xMin: -5, xMax: 25, yMin: 75, yMax: 105 },
+    { xMin: 75, xMax: 105, yMin: 75, yMax: 105 },
+    { xMin: 25, xMax: 40, yMin: 10, yMax: 90 },
+    { xMin: 60, xMax: 75, yMin: 10, yMax: 90 },
+    { xMin: 20, xMax: 80, yMin: -5, yMax: 20 },
+    { xMin: 20, xMax: 80, yMin: 80, yMax: 105 },
   ]
-  
+
   for (let i = 0; i < count; i++) {
     const zone = zones[i % zones.length]
     const x = zone.xMin + Math.random() * (zone.xMax - zone.xMin)
     const y = zone.yMin + Math.random() * (zone.yMax - zone.yMin)
-    
-    // 靠近中心的便签 z-index 更低（藏在登录框下面）
     const distFromCenter = Math.sqrt(Math.pow(x - 50, 2) + Math.pow(y - 50, 2))
-    const zIndex = distFromCenter < 25 ? 5 : 20
-    
     positions.push({
-      x, y,
+      x,
+      y,
       rotation: -8 + Math.random() * 16,
-      zIndex
+      zIndex: distFromCenter < 25 ? 5 : 20,
     })
   }
   return positions
@@ -62,25 +74,23 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
   const [stickers, setStickers] = useState<Sticker[]>([])
   const [selectedSticker, setSelectedSticker] = useState<Sticker | null>(null)
   const [copied, setCopied] = useState(false)
-  // 30% 概率显示跑出来的便签，随机选择一个便签索引
   const showEscapedSticker = useRef(Math.random() < 0.3)
   const escapedStickerIndex = useRef(Math.floor(Math.random() * 100))
 
   useEffect(() => {
     fetch('/api/clipboard/public/stickers')
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data.success) setStickers(data.data || [])
       })
       .catch(() => {})
   }, [])
 
-  // 为每个便签分配随机颜色和位置
   const stickerStyles = useMemo(() => {
     const positions = generatePositions(stickers.length)
     return stickers.map((_, i) => ({
       color: COLORS[i % COLORS.length],
-      position: positions[i] || { x: 10, y: 10, rotation: 0, zIndex: 20 }
+      position: positions[i] || { x: 10, y: 10, rotation: 0, zIndex: 20 },
     }))
   }, [stickers.length])
 
@@ -90,14 +100,6 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {}
-  }
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'code': return CodeBracketIcon
-      case 'image': return PhotoIcon
-      default: return DocumentTextIcon
-    }
   }
 
   if (stickers.length === 0) return null
@@ -136,7 +138,7 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
       </div>
 
       {/* 移动端：底部标签露头 */}
-      <div 
+      <div
         className="md:hidden fixed bottom-0 left-0 right-0 flex justify-center gap-2 px-4 cursor-pointer"
         onClick={onShowMobileList}
       >
@@ -145,7 +147,7 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
           return (
             <div
               key={sticker.id}
-              className={`${color.bg} ${color.border} border-t border-x rounded-t-lg px-3 py-2 transform translate-y-8 hover:translate-y-4 transition-transform shadow-md`}
+              className={`${color.bg} ${color.border} border-t border-x rounded-t-lg px-3 py-2 shadow-md`}
               style={{ transform: `translateY(60%) rotate(${-4 + i * 2}deg)` }}
             >
               <span className={`text-xs font-medium ${color.text} truncate block max-w-16`}>
@@ -161,37 +163,39 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
         )}
       </div>
 
-      {/* 移动端：30%概率逃逸标签 - 踩在底部标签上方 */}
-      {showEscapedSticker.current && stickers.length > 0 && (() => {
-        const randomIndex = escapedStickerIndex.current % stickers.length
-        const sticker = stickers[randomIndex]
-        const color = COLORS[randomIndex % COLORS.length]
-        return (
-          <div
-            className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 cursor-pointer z-20 animate-wiggle"
-            onClick={onShowMobileList}
-          >
-            <div 
-              className={`${color.bg} ${color.border} border rounded-lg px-4 py-2 shadow-lg`}
-              style={{ transform: 'rotate(-3deg)' }}
+      {/* 移动端：30%概率逃逸标签 */}
+      {showEscapedSticker.current &&
+        stickers.length > 0 &&
+        (() => {
+          const randomIndex = escapedStickerIndex.current % stickers.length
+          const sticker = stickers[randomIndex]
+          const color = COLORS[randomIndex % COLORS.length]
+          return (
+            <div
+              className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 cursor-pointer z-20 animate-wiggle"
+              onClick={onShowMobileList}
             >
-              <span className={`text-xs font-medium ${color.text} truncate block max-w-24`}>
-                {sticker.title || '便签'}
-              </span>
+              <div
+                className={`${color.bg} ${color.border} border rounded-lg px-4 py-2 shadow-lg`}
+                style={{ transform: 'rotate(-3deg)' }}
+              >
+                <span className={`text-xs font-medium ${color.text} truncate block max-w-24`}>
+                  {sticker.title || '便签'}
+                </span>
+              </div>
             </div>
-          </div>
-        )
-      })()}
+          )
+        })()}
 
       {/* 详情弹窗 */}
       {selectedSticker && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedSticker(null)}
         >
-          <div 
+          <div
             className="bg-white rounded-2xl max-w-lg w-full max-h-[80vh] overflow-hidden shadow-2xl"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-4 border-b">
               <div className="flex items-center gap-2">
@@ -201,7 +205,7 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
                 })()}
                 <h3 className="font-semibold text-lg">{selectedSticker.title || '无标题'}</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedSticker(null)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition"
               >
@@ -235,40 +239,39 @@ export default function PublicStickers({ onShowMobileList }: PublicStickersProps
   )
 }
 
-// 移动端便签列表组件
-export function MobileStickerList({ onClose }: { onClose: () => void }) {
-  const [stickers, setStickers] = useState<Sticker[]>([])
+// 移动端便签列表组件 - 接收 stickers 数据避免重复请求
+interface MobileStickerListProps {
+  onClose: () => void
+  stickers?: Sticker[]
+}
+
+export function MobileStickerList({ onClose, stickers: propStickers }: MobileStickerListProps) {
+  const [stickers, setStickers] = useState<Sticker[]>(propStickers || [])
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null) // 改为记录具体复制的便签ID
 
+  // 只有没传入 stickers 时才请求
   useEffect(() => {
-    fetch('/api/clipboard/public/stickers')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setStickers(data.data || [])
-      })
-      .catch(() => {})
-  }, [])
+    if (!propStickers) {
+      fetch('/api/clipboard/public/stickers')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) setStickers(data.data || [])
+        })
+        .catch(() => {})
+    }
+  }, [propStickers])
 
-  const copyContent = async (content: string) => {
+  const copyContent = async (content: string, stickerId: string) => {
     try {
       await navigator.clipboard.writeText(content)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      setCopiedId(stickerId)
+      setTimeout(() => setCopiedId(null), 1500)
     } catch {}
-  }
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'code': return CodeBracketIcon
-      case 'image': return PhotoIcon
-      default: return DocumentTextIcon
-    }
   }
 
   return (
     <div className="fixed inset-0 bg-gradient-to-b from-gray-50 to-white z-50 overflow-auto">
-      {/* 头部 */}
       <div className="sticky top-0 bg-white/80 backdrop-blur-sm border-b px-4 py-3 flex items-center gap-3">
         <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition">
           <ChevronLeftIcon className="w-5 h-5" />
@@ -276,19 +279,19 @@ export function MobileStickerList({ onClose }: { onClose: () => void }) {
         <h2 className="font-semibold text-lg">公开便签</h2>
       </div>
 
-      {/* 便签列表 */}
       <div className="p-4 space-y-3">
         {stickers.map((sticker, i) => {
           const color = COLORS[i % COLORS.length]
           const TypeIcon = getTypeIcon(sticker.type)
           const isExpanded = expandedId === sticker.id
+          const isCopied = copiedId === sticker.id
 
           return (
             <div
               key={sticker.id}
               className={`${color.bg} ${color.border} border rounded-xl overflow-hidden shadow-sm transition-all`}
             >
-              <div 
+              <div
                 className="p-4 cursor-pointer"
                 onClick={() => setExpandedId(isExpanded ? null : sticker.id)}
               >
@@ -318,11 +321,14 @@ export function MobileStickerList({ onClose }: { onClose: () => void }) {
                     )}
                   </div>
                   <button
-                    onClick={(e) => { e.stopPropagation(); copyContent(sticker.content) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      copyContent(sticker.content, sticker.id)
+                    }}
                     className={`flex items-center gap-2 px-4 py-2 bg-white/70 ${color.text} rounded-lg text-sm font-medium`}
                   >
                     <DocumentDuplicateIcon className="w-4 h-4" />
-                    {copied ? '已复制' : '复制'}
+                    {isCopied ? '已复制' : '复制'}
                   </button>
                 </div>
               )}
@@ -331,9 +337,7 @@ export function MobileStickerList({ onClose }: { onClose: () => void }) {
         })}
 
         {stickers.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            暂无公开便签
-          </div>
+          <div className="text-center py-12 text-gray-500">暂无公开便签</div>
         )}
       </div>
     </div>
