@@ -4,6 +4,8 @@ import { useEventListener } from '../hooks/useEventListener'
 import { DragDropProvider, SortableProvider } from '../contexts/DragDropContext'
 import { useDragOperations } from '../hooks/useDragOperations'
 import { useDragFeedback } from '../components/DragFeedback'
+import { DragEndEvent } from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
 import {
   Bars3Icon,
   MagnifyingGlassIcon,
@@ -22,6 +24,7 @@ import {
 } from '@heroicons/react/24/outline'
 import LinkCard from '../components/LinkCard'
 import CategoryDropZone from '../components/CategoryDropZone'
+import SortableCategoryItem from '../components/SortableCategoryItem'
 import NotesModule from '../components/NotesModule'
 import ClipboardModule from '../components/ClipboardModule'
 import SettingsModule from '../components/SettingsModule'
@@ -101,10 +104,6 @@ export default function Home() {
   const [clipboardItems, setClipboardItems] = useState<Array<{ id: string; title: string; content: string; type: string }>>([])
   const highlightedRef = useRef<string | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
-  
-  // 分类拖拽状态
-  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null)
-  const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null)
 
   // 保存 activeTab 到 sessionStorage
   useEffect(() => {
@@ -545,45 +544,22 @@ export default function Home() {
     }
   }
 
-  // 分类拖拽处理
-  const handleCategoryDragStart = (e: React.DragEvent, categoryId: string) => {
-    setDraggedCategoryId(categoryId)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', categoryId)
-  }
-
-  const handleCategoryDragOver = (e: React.DragEvent, categoryId: string) => {
-    e.preventDefault()
-    if (draggedCategoryId && draggedCategoryId !== categoryId) {
-      setDragOverCategoryId(categoryId)
-    }
-  }
-
-  const handleCategoryDragLeave = () => {
-    setDragOverCategoryId(null)
-  }
-
-  const handleCategoryDrop = async (e: React.DragEvent, targetCategoryId: string) => {
-    e.preventDefault()
-    if (!draggedCategoryId || draggedCategoryId === targetCategoryId) {
-      setDraggedCategoryId(null)
-      setDragOverCategoryId(null)
-      return
-    }
-
-    const draggedIndex = categories.findIndex(c => c.id === draggedCategoryId)
-    const targetIndex = categories.findIndex(c => c.id === targetCategoryId)
+  // 分类拖拽处理 (使用 dnd-kit)
+  const handleCategoryDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
     
-    if (draggedIndex === -1 || targetIndex === -1) return
-
-    const newCategories = [...categories]
-    const [removed] = newCategories.splice(draggedIndex, 1)
-    newCategories.splice(targetIndex, 0, removed)
+    // 检查是否是分类拖拽
+    if (active.data.current?.type !== 'category') return
     
+    const oldIndex = categories.findIndex(c => c.id === active.id)
+    const newIndex = categories.findIndex(c => c.id === over.id)
+    
+    if (oldIndex === -1 || newIndex === -1) return
+    
+    const newCategories = arrayMove(categories, oldIndex, newIndex)
     setCategories(newCategories)
-    setDraggedCategoryId(null)
-    setDragOverCategoryId(null)
-
+    
     try {
       await updateCategoryOrder(newCategories.map(c => c.id))
       showSuccess('分类已移动')
@@ -591,11 +567,6 @@ export default function Home() {
       showError('移动失败')
       loadCategories()
     }
-  }
-
-  const handleCategoryDragEnd = () => {
-    setDraggedCategoryId(null)
-    setDragOverCategoryId(null)
   }
 
   const { showSuccess, showError, NotificationContainer } = useDragFeedback()
@@ -719,7 +690,7 @@ export default function Home() {
         </div>
       )}
       
-      <DragDropProvider onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
+      <DragDropProvider onDragStart={handleDragStart} onDragEnd={(e) => { handleDragEnd(e); handleCategoryDragEnd(e); }} onDragCancel={handleDragCancel}>
         <div className={`min-h-screen bg-bg-main flex ${isDragInProgress ? 'select-none' : ''}`}>
           {/* 侧边栏 */}
           <aside className={`fixed inset-y-0 left-0 z-40 w-60 bg-bg-card border-r border-border-main flex flex-col transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -731,31 +702,17 @@ export default function Home() {
               <button onClick={() => setSelectedCategoryId(null)} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCategoryId === null ? 'bg-primary text-white font-medium' : 'text-text-main hover:bg-hover-bg'}`}>
                 全部 ({totalLinks})
               </button>
-              {categories.map((cat) => (
-                <div 
-                  key={cat.id} 
-                  className={`rounded-lg overflow-hidden bg-bg-card transition-all ${
-                    dragOverCategoryId === cat.id ? 'border-t-2 border-primary pt-1' : ''
-                  } ${isEditMode ? 'cursor-grab active:cursor-grabbing select-none' : ''} ${
-                    draggedCategoryId === cat.id ? 'opacity-50' : ''
-                  }`}
-                  draggable={isEditMode}
-                  onDragStart={(e) => handleCategoryDragStart(e, cat.id)}
-                  onDragOver={(e) => handleCategoryDragOver(e, cat.id)}
-                  onDragLeave={handleCategoryDragLeave}
-                  onDrop={(e) => handleCategoryDrop(e, cat.id)}
-                  onDragEnd={handleCategoryDragEnd}
-                  onClick={() => !isEditMode && setSelectedCategoryId(cat.id)}
-                >
-                  <div 
-                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors truncate ${
-                      selectedCategoryId === cat.id ? 'bg-primary text-white font-medium' : 'text-text-main hover:bg-hover-bg'
-                    }`}
-                  >
-                    {cat.name} ({cat.links.length})
-                  </div>
-                </div>
-              ))}
+              <SortableProvider items={categories.map(c => c.id)} strategy="vertical">
+                {categories.map((cat) => (
+                  <SortableCategoryItem
+                    key={cat.id}
+                    category={cat}
+                    isSelected={selectedCategoryId === cat.id}
+                    isEditMode={isEditMode}
+                    onClick={() => setSelectedCategoryId(cat.id)}
+                  />
+                ))}
+              </SortableProvider>
             </nav>
             <div className="h-14 px-4 border-t border-border-main flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-text-secondary">

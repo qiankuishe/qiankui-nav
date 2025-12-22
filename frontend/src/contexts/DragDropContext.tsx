@@ -15,8 +15,9 @@ import {
 import {
   SortableContext,
   rectSortingStrategy,
+  verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { GlobeAltIcon } from '@heroicons/react/24/outline'
+import { GlobeAltIcon, FolderIcon } from '@heroicons/react/24/outline'
 
 export interface DragItem {
   id: string
@@ -139,6 +140,16 @@ export function DragDropProvider({
 }
 
 function DragPreview({ item }: { item: DragItem }) {
+  if (item.type === 'category') {
+    return (
+      <div className="bg-bg-card border-2 border-primary rounded-lg px-3 py-2.5 shadow-2xl scale-105 w-[200px] cursor-grabbing">
+        <div className="flex items-center gap-2">
+          <FolderIcon className="w-4 h-4 text-primary" />
+          <span className="text-sm font-medium text-text-main truncate">{item.data.name}</span>
+        </div>
+      </div>
+    )
+  }
   if (item.type === 'link') {
     return (
       <div className="bg-bg-card border-2 border-primary rounded-lg p-3 shadow-2xl scale-105 w-[180px] cursor-grabbing">
@@ -166,9 +177,10 @@ interface SortableProviderProps {
   strategy?: 'vertical' | 'horizontal' | 'grid'
 }
 
-export function SortableProvider({ children, items }: SortableProviderProps) {
+export function SortableProvider({ children, items, strategy = 'grid' }: SortableProviderProps) {
+  const sortingStrategy = strategy === 'vertical' ? verticalListSortingStrategy : rectSortingStrategy
   return (
-    <SortableContext items={items} strategy={rectSortingStrategy}>
+    <SortableContext items={items} strategy={sortingStrategy}>
       {children}
     </SortableContext>
   )
