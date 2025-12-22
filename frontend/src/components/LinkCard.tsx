@@ -30,6 +30,7 @@ export default function LinkCard({ link, isEditMode, onEdit, onDelete }: LinkCar
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: transition || 'transform 200ms ease',
+    touchAction: isEditMode ? 'none' : 'auto',
   }
 
   const handleClick = (e: React.MouseEvent) => {
