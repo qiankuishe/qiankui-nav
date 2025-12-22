@@ -80,3 +80,12 @@ body {
 .animate-wiggle {
   animation: wiggle 2s ease-in-out infinite;
 }
+
+/* 编辑模式下禁用文本选择，防止手机端长按触发复制菜单 */
+.select-none {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}

@@ -736,7 +736,7 @@ export default function Home() {
                   key={cat.id} 
                   className={`rounded-lg overflow-hidden transition-all ${
                     dragOverCategoryId === cat.id ? 'border-t-2 border-primary pt-1' : ''
-                  } ${isEditMode ? 'cursor-grab active:cursor-grabbing' : ''} ${
+                  } ${isEditMode ? 'cursor-grab active:cursor-grabbing select-none' : ''} ${
                     draggedCategoryId === cat.id ? 'opacity-50' : ''
                   }`}
                   draggable={isEditMode}
