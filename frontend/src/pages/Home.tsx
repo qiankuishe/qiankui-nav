@@ -734,7 +734,7 @@ export default function Home() {
               {categories.map((cat) => (
                 <div 
                   key={cat.id} 
-                  className={`rounded-lg overflow-hidden transition-all ${
+                  className={`rounded-lg overflow-hidden bg-bg-card transition-all ${
                     dragOverCategoryId === cat.id ? 'border-t-2 border-primary pt-1' : ''
                   } ${isEditMode ? 'cursor-grab active:cursor-grabbing select-none' : ''} ${
                     draggedCategoryId === cat.id ? 'opacity-50' : ''
