@@ -125,11 +125,10 @@ export async function getExportStats(): Promise<ExportStats> {
 
 // Download export data as file
 export async function downloadExportData(): Promise<void> {
-  const response = await api.get('/api/settings/export', {
-    responseType: 'blob',
-  })
+  const response = await api.get('/api/settings/export')
+  const exportData = response.data?.data || response.data
 
-  const blob = new Blob([JSON.stringify(response.data)], { type: 'application/json' })
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
   const url = window.URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
