@@ -66,7 +66,7 @@ const searchEngines = {
 export default function Home() {
   const { user } = useAuth()
   const [categories, setCategories] = useState<CategoryWithLinks[]>([])
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -575,7 +575,39 @@ export default function Home() {
     onError: (msg) => { showError(msg); loadCategories() }
   })
 
-  const displayCategories = selectedCategoryId ? categories.filter(c => c.id === selectedCategoryId) : categories
+  // 滚动到指定分类
+  const scrollToCategory = (categoryId: string) => {
+    const element = document.getElementById(`category-${categoryId}`)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setActiveCategoryId(categoryId)
+    }
+  }
+
+  // 监听滚动，更新当前可见分类
+  useEffect(() => {
+    if (activeTab !== 'nav' || categories.length === 0) return
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id.replace('category-', '')
+            setActiveCategoryId(id)
+          }
+        })
+      },
+      { rootMargin: '-100px 0px -50% 0px', threshold: 0 }
+    )
+    
+    categories.forEach((cat) => {
+      const el = document.getElementById(`category-${cat.id}`)
+      if (el) observer.observe(el)
+    })
+    
+    return () => observer.disconnect()
+  }, [categories, activeTab])
+
   const totalLinks = categories.reduce((s, c) => s + c.links.length, 0)
 
   if (loading) return (
@@ -699,17 +731,14 @@ export default function Home() {
               <span className="font-semibold text-text-main">{siteName}</span>
             </div>
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
-              <button onClick={() => setSelectedCategoryId(null)} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCategoryId === null ? 'bg-primary text-white font-medium' : 'text-text-main hover:bg-hover-bg'}`}>
-                全部 ({totalLinks})
-              </button>
               <SortableProvider items={categories.map(c => c.id)} strategy="vertical">
                 {categories.map((cat) => (
                   <SortableCategoryItem
                     key={cat.id}
                     category={cat}
-                    isSelected={selectedCategoryId === cat.id}
+                    isSelected={activeCategoryId === cat.id}
                     isEditMode={isEditMode}
-                    onClick={() => setSelectedCategoryId(cat.id)}
+                    onClick={() => scrollToCategory(cat.id)}
                   />
                 ))}
               </SortableProvider>
@@ -829,9 +858,9 @@ export default function Home() {
                   {/* 只有非站内搜索或搜索为空时显示分类 */}
                   {(searchEngine !== 'local' || !searchQuery.trim()) && (
                   <div className="max-w-6xl mx-auto space-y-8">
-                    {displayCategories.map((cat) => (
+                    {categories.map((cat) => (
                       <CategoryDropZone key={cat.id} categoryId={cat.id} categoryName={cat.name} isEditMode={isEditMode}>
-                        <section>
+                        <section id={`category-${cat.id}`}>
                           <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold text-text-main">
                               {cat.name} <span className="text-sm font-normal text-text-secondary">({cat.links.length})</span>
@@ -894,7 +923,7 @@ export default function Home() {
                       </button>
                     )}
                     
-                    {displayCategories.length === 0 && !isEditMode && (
+                    {categories.length === 0 && !isEditMode && (
                       <div className="text-center py-16">
                         <FolderIcon className="w-16 h-16 mx-auto text-text-secondary mb-4" />
                         <h3 className="text-lg font-medium text-text-main mb-2">暂无链接</h3>
