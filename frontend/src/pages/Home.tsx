@@ -608,8 +608,6 @@ export default function Home() {
     return () => observer.disconnect()
   }, [categories, activeTab])
 
-  const totalLinks = categories.reduce((s, c) => s + c.links.length, 0)
-
   if (loading) return (
     <div className="min-h-screen bg-bg-main flex">
       {/* 侧边栏骨架 - 只在桌面端显示 */}
