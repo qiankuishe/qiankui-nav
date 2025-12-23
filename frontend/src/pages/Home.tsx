@@ -575,13 +575,8 @@ export default function Home() {
     onError: (msg) => { showError(msg); loadCategories() }
   })
 
-  // 筛选后的分类列表
-  const filteredCategories = selectedCategoryId
-    ? categories.filter(c => c.id === selectedCategoryId)
-    : categories
-
-  // 计算总链接数
-  const totalLinks = categories.reduce((sum, cat) => sum + cat.links.length, 0)
+  const displayCategories = selectedCategoryId ? categories.filter(c => c.id === selectedCategoryId) : categories
+  const totalLinks = categories.reduce((s, c) => s + c.links.length, 0)
 
   if (loading) return (
     <div className="min-h-screen bg-bg-main flex">
@@ -704,17 +699,8 @@ export default function Home() {
               <span className="font-semibold text-text-main">{siteName}</span>
             </div>
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
-              {/* 全部分类按钮 */}
-              <button
-                onClick={() => setSelectedCategoryId(null)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                  selectedCategoryId === null
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-text-main hover:bg-hover-bg'
-                }`}
-              >
-                <span>全部</span>
-                <span className="text-xs text-text-secondary">{totalLinks}</span>
+              <button onClick={() => setSelectedCategoryId(null)} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCategoryId === null ? 'bg-primary text-white font-medium' : 'text-text-main hover:bg-hover-bg'}`}>
+                全部 ({totalLinks})
               </button>
               <SortableProvider items={categories.map(c => c.id)} strategy="vertical">
                 {categories.map((cat) => (
@@ -843,9 +829,9 @@ export default function Home() {
                   {/* 只有非站内搜索或搜索为空时显示分类 */}
                   {(searchEngine !== 'local' || !searchQuery.trim()) && (
                   <div className="max-w-6xl mx-auto space-y-8">
-                    {filteredCategories.map((cat) => (
+                    {displayCategories.map((cat) => (
                       <CategoryDropZone key={cat.id} categoryId={cat.id} categoryName={cat.name} isEditMode={isEditMode}>
-                        <section id={`category-${cat.id}`}>
+                        <section>
                           <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold text-text-main">
                               {cat.name} <span className="text-sm font-normal text-text-secondary">({cat.links.length})</span>
@@ -897,8 +883,8 @@ export default function Home() {
                       </CategoryDropZone>
                     ))}
                     
-                    {/* 编辑模式下显示添加分类按钮 - 只在显示全部时显示 */}
-                    {isEditMode && !selectedCategoryId && (
+                    {/* 编辑模式下显示添加分类按钮 */}
+                    {isEditMode && (
                       <button
                         onClick={openAddCategory}
                         className="w-full py-4 border-2 border-dashed border-border-main rounded-xl text-text-secondary hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors font-medium flex items-center justify-center gap-2"
@@ -908,7 +894,7 @@ export default function Home() {
                       </button>
                     )}
                     
-                    {filteredCategories.length === 0 && !isEditMode && (
+                    {displayCategories.length === 0 && !isEditMode && (
                       <div className="text-center py-16">
                         <FolderIcon className="w-16 h-16 mx-auto text-text-secondary mb-4" />
                         <h3 className="text-lg font-medium text-text-main mb-2">暂无链接</h3>
