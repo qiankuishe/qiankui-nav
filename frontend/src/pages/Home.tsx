@@ -66,7 +66,7 @@ const searchEngines = {
 export default function Home() {
   const { user } = useAuth()
   const [categories, setCategories] = useState<CategoryWithLinks[]>([])
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -575,38 +575,13 @@ export default function Home() {
     onError: (msg) => { showError(msg); loadCategories() }
   })
 
-  // 滚动到指定分类
-  const scrollToCategory = (categoryId: string) => {
-    const element = document.getElementById(`category-${categoryId}`)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      setActiveCategoryId(categoryId)
-    }
-  }
+  // 筛选后的分类列表
+  const filteredCategories = selectedCategoryId
+    ? categories.filter(c => c.id === selectedCategoryId)
+    : categories
 
-  // 监听滚动，更新当前可见分类
-  useEffect(() => {
-    if (activeTab !== 'nav' || categories.length === 0) return
-    
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const id = entry.target.id.replace('category-', '')
-            setActiveCategoryId(id)
-          }
-        })
-      },
-      { rootMargin: '-100px 0px -50% 0px', threshold: 0 }
-    )
-    
-    categories.forEach((cat) => {
-      const el = document.getElementById(`category-${cat.id}`)
-      if (el) observer.observe(el)
-    })
-    
-    return () => observer.disconnect()
-  }, [categories, activeTab])
+  // 计算总链接数
+  const totalLinks = categories.reduce((sum, cat) => sum + cat.links.length, 0)
 
   if (loading) return (
     <div className="min-h-screen bg-bg-main flex">
@@ -729,14 +704,26 @@ export default function Home() {
               <span className="font-semibold text-text-main">{siteName}</span>
             </div>
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+              {/* 全部分类按钮 */}
+              <button
+                onClick={() => setSelectedCategoryId(null)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                  selectedCategoryId === null
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-text-main hover:bg-hover-bg'
+                }`}
+              >
+                <span>全部</span>
+                <span className="text-xs text-text-secondary">{totalLinks}</span>
+              </button>
               <SortableProvider items={categories.map(c => c.id)} strategy="vertical">
                 {categories.map((cat) => (
                   <SortableCategoryItem
                     key={cat.id}
                     category={cat}
-                    isSelected={activeCategoryId === cat.id}
+                    isSelected={selectedCategoryId === cat.id}
                     isEditMode={isEditMode}
-                    onClick={() => scrollToCategory(cat.id)}
+                    onClick={() => setSelectedCategoryId(cat.id)}
                   />
                 ))}
               </SortableProvider>
@@ -856,7 +843,7 @@ export default function Home() {
                   {/* 只有非站内搜索或搜索为空时显示分类 */}
                   {(searchEngine !== 'local' || !searchQuery.trim()) && (
                   <div className="max-w-6xl mx-auto space-y-8">
-                    {categories.map((cat) => (
+                    {filteredCategories.map((cat) => (
                       <CategoryDropZone key={cat.id} categoryId={cat.id} categoryName={cat.name} isEditMode={isEditMode}>
                         <section id={`category-${cat.id}`}>
                           <div className="flex items-center justify-between mb-4">
@@ -910,8 +897,8 @@ export default function Home() {
                       </CategoryDropZone>
                     ))}
                     
-                    {/* 编辑模式下显示添加分类按钮 */}
-                    {isEditMode && (
+                    {/* 编辑模式下显示添加分类按钮 - 只在显示全部时显示 */}
+                    {isEditMode && !selectedCategoryId && (
                       <button
                         onClick={openAddCategory}
                         className="w-full py-4 border-2 border-dashed border-border-main rounded-xl text-text-secondary hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors font-medium flex items-center justify-center gap-2"
@@ -921,7 +908,7 @@ export default function Home() {
                       </button>
                     )}
                     
-                    {categories.length === 0 && !isEditMode && (
+                    {filteredCategories.length === 0 && !isEditMode && (
                       <div className="text-center py-16">
                         <FolderIcon className="w-16 h-16 mx-auto text-text-secondary mb-4" />
                         <h3 className="text-lg font-medium text-text-main mb-2">暂无链接</h3>
