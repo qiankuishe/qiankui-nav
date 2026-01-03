@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "docker:build": "docker build -t qiankui-nav .",
-    "docker:run": "docker run -d -p 3000:3000 -v qiankui-data:/app/data qiankui-nav"
+    "docker:run": "docker run -d -p 3001:3001 -v qiankui-data:/app/data qiankui-nav"
   },
   "dependencies": {
     "@fastify/cors": "^8.4.0",

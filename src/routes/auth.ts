@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import bcrypt from 'bcrypt'
-import { v4 as uuidv4 } from 'uuid'
 import { getDb } from '../db.js'
 import { generateToken, getAuthUser } from '../auth.js'
 
@@ -192,41 +191,6 @@ export async function authRoutes(fastify: FastifyInstance) {
         id: user.id, 
         username: user.username,
         settings: user.settings ? JSON.parse(user.settings) : {}
-      } 
-    }
-  })
-
-  // 注册
-  fastify.post('/register', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { username, password } = request.body as { username: string; password: string }
-    
-    if (!username || !password || password.length < 6) {
-      return reply.status(400).send({ success: false, error: '用户名和密码（至少6位）不能为空' })
-    }
-
-    const db = getDb()
-    const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(username)
-    
-    if (exists) {
-      return reply.status(409).send({ success: false, error: '用户名已存在' })
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10)
-    const userId = uuidv4()
-    
-    db.prepare(`
-      INSERT INTO users (id, username, password_hash, settings)
-      VALUES (?, ?, ?, '{}')
-    `).run(userId, username, passwordHash)
-
-    const token = generateToken(userId, username)
-    return { 
-      success: true, 
-      token, 
-      user: { 
-        id: userId, 
-        username,
-        settings: {}
       } 
     }
   })

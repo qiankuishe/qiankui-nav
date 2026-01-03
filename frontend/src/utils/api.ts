@@ -80,22 +80,12 @@ export const authAPI = {
     }
   },
 
-  register: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    const response = await api.post('/api/auth/register', credentials)
-    return response.data
-  },
-
   logout: async (): Promise<void> => {
     await api.post('/api/auth/logout')
   },
 
   validateSession: async (): Promise<AuthResponse> => {
     const response = await api.get('/api/auth/validate')
-    return response.data
-  },
-
-  refreshToken: async (token: string): Promise<AuthResponse> => {
-    const response = await api.post('/api/auth/refresh', { token })
     return response.data
   },
 }
@@ -189,11 +179,6 @@ export const navigationAPI = {
 
   reorderLinks: async (categoryId: string, linkIds: string[]): Promise<{ success: boolean; error?: string }> => {
     const response = await api.put('/api/navigation/links/reorder', { categoryId, linkIds })
-    return response.data
-  },
-
-  searchLinks: async (query: string): Promise<{ success: boolean; data?: Link[]; error?: string }> => {
-    const response = await api.get(`/api/navigation/search?q=${encodeURIComponent(query)}`)
     return response.data
   },
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { DragEndEvent } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import { 
@@ -21,10 +21,22 @@ export function useDragOperations({
   onError
 }: UseDragOperationsProps) {
   const [isDragInProgress, setIsDragInProgress] = useState(false)
+  // 保存拖拽前的状态，用于失败时回滚
+  const categoriesBeforeDrag = useRef<CategoryWithLinks[] | null>(null)
 
   const handleDragStart = useCallback(() => {
     setIsDragInProgress(true)
-  }, [])
+    // 保存当前状态的深拷贝
+    categoriesBeforeDrag.current = JSON.parse(JSON.stringify(categories))
+  }, [categories])
+
+  // 回滚到拖拽前的状态
+  const rollback = useCallback(() => {
+    if (categoriesBeforeDrag.current) {
+      setCategories(categoriesBeforeDrag.current)
+      categoriesBeforeDrag.current = null
+    }
+  }, [setCategories])
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
@@ -125,14 +137,18 @@ export function useDragOperations({
       }
     } catch (error) {
       console.error('Drag operation error:', error)
-      onError?.('操作失败，请重试')
+      // 回滚 UI 状态
+      rollback()
+      onError?.('操作失败，已恢复原状态')
     } finally {
       setIsDragInProgress(false)
+      categoriesBeforeDrag.current = null
     }
-  }, [categories, setCategories, onSuccess, onError])
+  }, [categories, setCategories, onSuccess, onError, rollback])
 
   const handleDragCancel = useCallback(() => {
     setIsDragInProgress(false)
+    categoriesBeforeDrag.current = null
   }, [])
 
   return {

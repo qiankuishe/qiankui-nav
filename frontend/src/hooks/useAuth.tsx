@@ -13,7 +13,6 @@ interface AuthContextType {
   isAuthenticated: boolean
   login: (credentials: LoginCredentials) => Promise<AuthResponse>
   logout: () => Promise<void>
-  register: (credentials: LoginCredentials) => Promise<AuthResponse>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -70,26 +69,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return response
   }
 
-  const register = async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    try {
-      const response = await authAPI.register(credentials)
-      
-      if (response.success && response.user && response.token) {
-        setUser(response.user)
-        localStorage.setItem('auth_token', response.token)
-        localStorage.setItem('user_info', JSON.stringify(response.user))
-      }
-      
-      return response
-    } catch (error: any) {
-      console.error('Registration failed:', error)
-      return {
-        success: false,
-        error: error.response?.data?.error || 'Registration failed'
-      }
-    }
-  }
-
   const logout = async (): Promise<void> => {
     try {
       await authAPI.logout()
@@ -108,7 +87,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated,
     login,
     logout,
-    register,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

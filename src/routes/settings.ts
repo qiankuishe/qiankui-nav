@@ -2,21 +2,15 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import bcrypt from 'bcrypt'
 import { v4 as uuidv4 } from 'uuid'
 import { getDb } from '../db.js'
-import { getAuthUser } from '../auth.js'
+import { registerAuthMiddleware, getUserId } from '../middleware/auth.js'
 
 export async function settingsRoutes(fastify: FastifyInstance) {
-  // 认证中间件
-  fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = getAuthUser(request)
-    if (!user) {
-      return reply.status(401).send({ success: false, error: '未登录' })
-    }
-    ;(request as any).user = user
-  })
+  // 使用共享认证中间�?
+  registerAuthMiddleware(fastify)
 
   // 获取用户设置
   fastify.get('/', async (request: FastifyRequest) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const db = getDb()
     
     const user = db.prepare('SELECT settings FROM users WHERE id = ?').get(userId) as any
@@ -27,7 +21,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
 
   // 更新用户设置
   fastify.put('/', async (request: FastifyRequest) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const newSettings = request.body as Record<string, any>
     const db = getDb()
     
@@ -43,7 +37,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
 
   // 导出用户数据
   fastify.get('/export', async (request: FastifyRequest, reply: FastifyReply) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const db = getDb()
     
     const user = db.prepare('SELECT username, settings FROM users WHERE id = ?').get(userId) as any
@@ -77,15 +71,16 @@ export async function settingsRoutes(fastify: FastifyInstance) {
 
   // 导入用户数据
   fastify.post('/import', async (request: FastifyRequest, reply: FastifyReply) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const importData = request.body as any
     const db = getDb()
     
     const imported = { categories: 0, links: 0, notes: 0, clipboard_items: 0 }
     const errors: string[] = []
 
-    try {
-      // 导入分类和链接
+    // 使用事务保护，确保数据一致�?
+    const transaction = db.transaction(() => {
+      // 导入分类和链�?
       if (importData.categories && Array.isArray(importData.categories)) {
         for (const cat of importData.categories) {
           try {
@@ -107,6 +102,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
             }
           } catch (e) {
             errors.push(`导入分类失败: ${cat.name}`)
+            throw e // 事务中抛出错误会触发回滚
           }
         }
       }
@@ -121,11 +117,12 @@ export async function settingsRoutes(fastify: FastifyInstance) {
             imported.notes++
           } catch (e) {
             errors.push(`导入笔记失败: ${note.title}`)
+            throw e
           }
         }
       }
 
-      // 导入剪贴板
+      // 导入剪贴�?
       if (importData.clipboard_items && Array.isArray(importData.clipboard_items)) {
         for (const item of importData.clipboard_items) {
           try {
@@ -134,7 +131,8 @@ export async function settingsRoutes(fastify: FastifyInstance) {
             `).run(uuidv4(), userId, item.type || 'text', item.title, item.content || '')
             imported.clipboard_items++
           } catch (e) {
-            errors.push(`导入剪贴板失败: ${item.title}`)
+            errors.push(`导入剪贴板失�? ${item.title}`)
+            throw e
           }
         }
       }
@@ -144,18 +142,21 @@ export async function settingsRoutes(fastify: FastifyInstance) {
         db.prepare('UPDATE users SET settings = ? WHERE id = ?')
           .run(JSON.stringify(importData.user.settings), userId)
       }
+    })
 
+    try {
+      transaction()
       return {
         success: true,
         message: '导入完成',
         imported,
-        errors
+        errors: []
       }
     } catch (error) {
       return reply.status(400).send({
         success: false,
-        message: '导入失败',
-        imported,
+        message: '导入失败，已回滚所有更�?,
+        imported: { categories: 0, links: 0, notes: 0, clipboard_items: 0 },
         errors: [...errors, String(error)]
       })
     }
@@ -163,7 +164,7 @@ export async function settingsRoutes(fastify: FastifyInstance) {
 
   // 更新账号凭证
   fastify.put('/credentials', async (request: FastifyRequest, reply: FastifyReply) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const { currentPassword, newPassword, newUsername } = request.body as { 
       currentPassword: string
       newPassword?: string
@@ -171,26 +172,26 @@ export async function settingsRoutes(fastify: FastifyInstance) {
     }
     
     if (!currentPassword) {
-      return reply.status(400).send({ success: false, error: '请输入当前密码' })
+      return reply.status(400).send({ success: false, error: '请输入当前密�? })
     }
     
     if (!newPassword && !newUsername) {
-      return reply.status(400).send({ success: false, error: '请输入新密码或新用户名' })
+      return reply.status(400).send({ success: false, error: '请输入新密码或新用户�? })
     }
     
     if (newPassword && newPassword.length < 6) {
-      return reply.status(400).send({ success: false, error: '新密码至少6位' })
+      return reply.status(400).send({ success: false, error: '新密码至�?�? })
     }
     
     if (newUsername && newUsername.length < 2) {
-      return reply.status(400).send({ success: false, error: '用户名至少2位' })
+      return reply.status(400).send({ success: false, error: '用户名至�?�? })
     }
 
     const db = getDb()
     const user = db.prepare('SELECT password_hash, username FROM users WHERE id = ?').get(userId) as any
     
     if (!user) {
-      return reply.status(404).send({ success: false, error: '用户不存在' })
+      return reply.status(404).send({ success: false, error: '用户不存�? })
     }
 
     const isValid = await bcrypt.compare(currentPassword, user.password_hash)
@@ -226,18 +227,18 @@ export async function settingsRoutes(fastify: FastifyInstance) {
 
     const messages: string[] = []
     if (newPassword) messages.push('密码')
-    if (newUsername) messages.push('用户名')
+    if (newUsername) messages.push('用户�?)
     
     return { 
       success: true,
-      message: `${messages.join('和')}修改成功`,
+      message: `${messages.join('�?)}修改成功`,
       username: newUsername || user.username
     }
   })
 
   // 导出统计
   fastify.get('/export/stats', async (request: FastifyRequest) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const db = getDb()
     
     const categoriesCount = (db.prepare('SELECT COUNT(*) as count FROM categories WHERE user_id = ?').get(userId) as any).count

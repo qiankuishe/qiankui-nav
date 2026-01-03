@@ -1,10 +1,10 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { v4 as uuidv4 } from 'uuid'
 import { getDb } from '../db.js'
-import { getAuthUser } from '../auth.js'
+import { registerAuthMiddleware, getUserId } from '../middleware/auth.js'
 
 export async function clipboardRoutes(fastify: FastifyInstance) {
-  // 公开 API：获取公开便签（无需认证）
+  // 公开 API：获取公开便签（无需认证�?
   fastify.get('/public/stickers', async () => {
     const db = getDb()
     const items = db.prepare(`
@@ -17,21 +17,12 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     return { success: true, data: items }
   })
 
-  // 认证中间件（排除公开 API）
-  fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
-    // 公开 API 不需要认证
-    if (request.url.includes('/public/')) return
-    
-    const user = getAuthUser(request)
-    if (!user) {
-      return reply.status(401).send({ success: false, error: '未登录' })
-    }
-    ;(request as any).user = user
-  })
+  // 使用共享认证中间件（排除公开 API�?
+  registerAuthMiddleware(fastify, { exclude: ['/public/'] })
 
   // 获取所有剪贴板项目
   fastify.get('/items', async (request: FastifyRequest) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const { type } = request.query as { type?: string }
     const db = getDb()
     
@@ -49,9 +40,9 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     return { success: true, data: items }
   })
 
-  // 获取单个剪贴板项目
+  // 获取单个剪贴板项�?
   fastify.get('/items/:id', async (request: FastifyRequest, reply: FastifyReply) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const { id } = request.params as { id: string }
     const db = getDb()
     
@@ -64,9 +55,9 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     return { success: true, data: item }
   })
 
-  // 创建剪贴板项目
+  // 创建剪贴板项�?
   fastify.post('/items', async (request: FastifyRequest, reply: FastifyReply) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const { type, title, content, is_public } = request.body as { type?: string; title?: string; content?: string; is_public?: number }
     
     if (!type) {
@@ -74,7 +65,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     }
     
     if (!['text', 'code', 'image'].includes(type)) {
-      return reply.status(400).send({ success: false, error: '类型必须是 text、code 或 image' })
+      return reply.status(400).send({ success: false, error: '类型必须�?text、code �?image' })
     }
 
     const finalTitle = title || (type === 'code' ? '代码片段' : type === 'image' ? '图片' : '文本')
@@ -90,9 +81,9 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     return reply.status(201).send({ success: true, data: item })
   })
 
-  // 更新剪贴板项目
+  // 更新剪贴板项�?
   fastify.put('/items/:id', async (request: FastifyRequest, reply: FastifyReply) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const { id } = request.params as { id: string }
     const { title, content, is_public } = request.body as { title?: string; content?: string; is_public?: number }
     const db = getDb()
@@ -123,9 +114,9 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     return { success: true, data: item }
   })
 
-  // 删除剪贴板项目
+  // 删除剪贴板项�?
   fastify.delete('/items/:id', async (request: FastifyRequest, reply: FastifyReply) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const { id } = request.params as { id: string }
     const db = getDb()
     
@@ -138,13 +129,13 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
     return { success: true }
   })
 
-  // 搜索剪贴板项目
+  // 搜索剪贴板项�?
   fastify.get('/search', async (request: FastifyRequest, reply: FastifyReply) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const { q, type } = request.query as { q?: string; type?: string }
     
     if (!q || q.trim().length === 0) {
-      return reply.status(400).send({ success: false, error: '搜索关键词不能为空' })
+      return reply.status(400).send({ success: false, error: '搜索关键词不能为�? })
     }
 
     const db = getDb()
@@ -165,7 +156,7 @@ export async function clipboardRoutes(fastify: FastifyInstance) {
 
   // 批量删除所有剪贴板项目
   fastify.delete('/all/items', async (request: FastifyRequest) => {
-    const userId = (request as any).user.userId
+    const userId = getUserId(request)
     const db = getDb()
     
     db.prepare('DELETE FROM clipboard_items WHERE user_id = ?').run(userId)

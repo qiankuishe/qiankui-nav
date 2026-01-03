@@ -74,7 +74,7 @@ async function start() {
     return reply.status(404).send({ error: '页面不存在' })
   })
 
-  const port = parseInt(process.env.PORT || '3000')
+  const port = parseInt(process.env.PORT || '3001')
   const host = process.env.HOST || '0.0.0.0'
 
   await fastify.listen({ port, host })

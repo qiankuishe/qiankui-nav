@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { MapPinIcon } from '@heroicons/react/24/solid'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import {
   Note,
   getNotes,
@@ -24,6 +25,12 @@ marked.setOptions({
   breaks: true,
   gfm: true,
 })
+
+// 安全渲染 Markdown
+function renderMarkdown(content: string): string {
+  const html = marked(content) as string
+  return DOMPurify.sanitize(html)
+}
 
 interface NotesModuleProps {
   highlightId?: string | null
@@ -394,7 +401,7 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
                   prose-li:text-text-main
                   prose-hr:border-border-main"
                 dangerouslySetInnerHTML={{ 
-                  __html: editContent ? marked(editContent) as string : '<p class="text-text-secondary">暂无内容</p>' 
+                  __html: editContent ? renderMarkdown(editContent) : '<p class="text-text-secondary">暂无内容</p>' 
                 }}
               />
             ) : (
