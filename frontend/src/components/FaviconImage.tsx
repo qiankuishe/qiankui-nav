@@ -7,16 +7,16 @@ interface FaviconImageProps {
   className?: string
 }
 
-// 多个 Google favicon 源
+// 多个 favicon 源（Google 优先）
 const FAVICON_SOURCES = [
+  // Google favicon 服务
   (domain: string) =>
     `https://www.google.com/s2/favicons?sz=64&domain=${domain}`,
   (domain: string) =>
     `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=64`,
+  // 直接获取网站 favicon
   (domain: string) =>
-    `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=64`,
-  (domain: string) =>
-    `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=64`,
+    `https://${domain}/favicon.ico`,
 ]
 
 function getDomain(url: string): string {
@@ -30,7 +30,6 @@ function getDomain(url: string): string {
 export default function FaviconImage({ url, title, className = 'w-7 h-7' }: FaviconImageProps) {
   const [sourceIndex, setSourceIndex] = useState(0)
   const [showLetter, setShowLetter] = useState(false)
-  const [triedDirect, setTriedDirect] = useState(false)
   const [cachedDataUrl, setCachedDataUrl] = useState<string | null>(null)
   const [cacheChecked, setCacheChecked] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -50,11 +49,6 @@ export default function FaviconImage({ url, title, className = 'w-7 h-7' }: Favi
       setSourceIndex(nextIdx)
       return
     }
-    // 尝试直接获取网站的 favicon.ico
-    if (!triedDirect && domain) {
-      setTriedDirect(true)
-      return
-    }
     // 所有源都失败，显示字母
     setShowLetter(true)
   }
@@ -65,15 +59,15 @@ export default function FaviconImage({ url, title, className = 'w-7 h-7' }: Favi
 
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.target as HTMLImageElement
-    // 只检测是否太小（≤16px），太小说明是默认图标
-    if (img.naturalWidth <= 16) {
+    
+    // 检测是否太小（≤16px）或无效，太小说明是默认图标
+    if (img.naturalWidth <= 16 || img.naturalHeight <= 16) {
       tryNextSource()
       return
     }
     
-    // 成功加载，缓存到 IndexedDB
+    // 成功加载，尝试缓存到 IndexedDB（跨域图片会静默失败）
     if (!cachedDataUrl && img.src && !img.src.startsWith('data:')) {
-      // 将图片转换为 data URL 并缓存
       try {
         const canvas = document.createElement('canvas')
         canvas.width = img.naturalWidth
@@ -125,7 +119,6 @@ export default function FaviconImage({ url, title, className = 'w-7 h-7' }: Favi
   useEffect(() => {
     setSourceIndex(0)
     setShowLetter(false)
-    setTriedDirect(false)
     setCachedDataUrl(null)
     setCacheChecked(false)
   }, [url])
@@ -162,12 +155,7 @@ export default function FaviconImage({ url, title, className = 'w-7 h-7' }: Favi
   }
 
   // 确定图标源
-  let imgSrc = ''
-  if (triedDirect && domain) {
-    imgSrc = `https://${domain}/favicon.ico`
-  } else {
-    imgSrc = getFavicon(sourceIndex)
-  }
+  const imgSrc = getFavicon(sourceIndex)
 
   return (
     <img
@@ -175,7 +163,6 @@ export default function FaviconImage({ url, title, className = 'w-7 h-7' }: Favi
       src={imgSrc}
       alt=""
       className={`${className} rounded object-cover`}
-      crossOrigin="anonymous"
       onError={handleError}
       onLoad={handleLoad}
     />
