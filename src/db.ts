@@ -106,6 +106,17 @@ export async function initDatabase() {
     console.log('✅ Added is_pinned column to notes')
   }
 
+  // 数据库迁移：为 links 表添加访问统计字段
+  const linkColumns = db.prepare("PRAGMA table_info(links)").all() as { name: string }[]
+  if (!linkColumns.some(c => c.name === 'visit_count')) {
+    db.exec('ALTER TABLE links ADD COLUMN visit_count INTEGER DEFAULT 0')
+    console.log('✅ Added visit_count column to links')
+  }
+  if (!linkColumns.some(c => c.name === 'last_visited_at')) {
+    db.exec('ALTER TABLE links ADD COLUMN last_visited_at DATETIME')
+    console.log('✅ Added last_visited_at column to links')
+  }
+
   // 创建默认管理员账号和示例数据
   const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin')
   if (!adminExists) {

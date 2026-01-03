@@ -10,6 +10,8 @@ import {
   XMarkIcon,
   ExclamationTriangleIcon,
   TrashIcon,
+  SwatchIcon,
+  BookmarkIcon,
 } from '@heroicons/react/24/outline'
 import ConfirmModal from './ConfirmModal'
 import api from '../utils/api'
@@ -32,6 +34,25 @@ export default function SettingsModule() {
   const [exportStats, setExportStats] = useState<ExportStats | null>(null)
   const [loading, setLoading] = useState(true)
   
+  // 主题配色
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    return localStorage.getItem('colorTheme') || 'warm-brown'
+  })
+  
+  // 最近访问显示开关
+  const [showRecentVisits, setShowRecentVisits] = useState(() => {
+    return localStorage.getItem('showRecentVisits') !== 'false'
+  })
+  
+  const themes = [
+    { id: 'warm-brown', name: '温暖棕', colors: ['#faf8f5', '#a67c52', '#8b6642'] },
+    { id: 'cream-black', name: '素雅白', colors: ['#fefdfb', '#333333', '#1a1a1a'] },
+    { id: 'ocean-blue', name: '海洋蓝', colors: ['#f0f7ff', '#3b82f6', '#1e3a5f'] },
+    { id: 'forest-green', name: '森林绿', colors: ['#f0f7f4', '#059669', '#1a4d3e'] },
+    { id: 'rose-pink', name: '玫瑰粉', colors: ['#fdf2f4', '#ec4899', '#831843'] },
+    { id: 'violet-purple', name: '紫罗兰', colors: ['#f5f3ff', '#8b5cf6', '#4c1d95'] },
+  ]
+  
   // 网站设置
   const [websiteName, setWebsiteName] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
@@ -52,6 +73,10 @@ export default function SettingsModule() {
     title: string
     message: string
   }>({ isOpen: false, type: null, title: '', message: '' })
+  
+  // 书签导入
+  const [importingBookmarks, setImportingBookmarks] = useState(false)
+  const bookmarkInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadData()
@@ -70,6 +95,144 @@ export default function SettingsModule() {
       console.error('Failed to load data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 应用主题
+  const applyTheme = (themeId: string) => {
+    setCurrentTheme(themeId)
+    localStorage.setItem('colorTheme', themeId)
+    
+    if (themeId === 'warm-brown') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', themeId)
+    }
+  }
+
+  // 切换最近访问显示
+  const toggleRecentVisits = (show: boolean) => {
+    setShowRecentVisits(show)
+    localStorage.setItem('showRecentVisits', show ? 'true' : 'false')
+    window.dispatchEvent(new CustomEvent('recentVisitsToggled', { detail: { show } }))
+  }
+
+  // 初始化主题
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('colorTheme') || 'warm-brown'
+    if (savedTheme !== 'warm-brown') {
+      document.documentElement.setAttribute('data-theme', savedTheme)
+    }
+  }, [])
+
+  // 解析浏览器书签 HTML 文件
+  const parseBookmarksHtml = (html: string): { folders: { name: string; links: { title: string; url: string }[] }[] } => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    const folders: { name: string; links: { title: string; url: string }[] }[] = []
+    
+    // 查找所有 DL 元素（书签文件夹容器）
+    const processDL = (dl: Element, folderName: string = '导入的书签') => {
+      const links: { title: string; url: string }[] = []
+      const children = dl.children
+      
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i]
+        if (child.tagName === 'DT') {
+          const h3 = child.querySelector(':scope > H3')
+          const a = child.querySelector(':scope > A')
+          const subDl = child.querySelector(':scope > DL')
+          
+          if (h3 && subDl) {
+            // 这是一个文件夹
+            processDL(subDl, h3.textContent || '未命名文件夹')
+          } else if (a) {
+            // 这是一个链接
+            const href = a.getAttribute('HREF')
+            const title = a.textContent || ''
+            if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+              links.push({ title: title || new URL(href).hostname, url: href })
+            }
+          }
+        }
+      }
+      
+      if (links.length > 0) {
+        folders.push({ name: folderName, links })
+      }
+    }
+    
+    const rootDL = doc.querySelector('DL')
+    if (rootDL) {
+      processDL(rootDL)
+    }
+    
+    return { folders }
+  }
+
+  // 导入书签
+  const handleBookmarkImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    
+    try {
+      setImportingBookmarks(true)
+      const html = await file.text()
+      const { folders } = parseBookmarksHtml(html)
+      
+      if (folders.length === 0) {
+        showError('未找到有效的书签')
+        return
+      }
+      
+      let totalLinks = 0
+      let totalCategories = 0
+      
+      // 为每个文件夹创建分类并添加链接
+      for (const folder of folders) {
+        try {
+          // 创建分类
+          const catResult = await api.post('/api/navigation/categories', {
+            name: folder.name,
+            order: 999 // 放到最后
+          })
+          
+          if (catResult.data?.data?.id) {
+            totalCategories++
+            const categoryId = catResult.data.data.id
+            
+            // 添加链接
+            for (let i = 0; i < folder.links.length; i++) {
+              const link = folder.links[i]
+              try {
+                await api.post('/api/navigation/links', {
+                  categoryId,
+                  title: link.title,
+                  url: link.url,
+                  order: i
+                })
+                totalLinks++
+              } catch (e) {
+                console.error('Failed to import link:', link.title, e)
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Failed to create category:', folder.name, e)
+        }
+      }
+      
+      showSuccess(`成功导入 ${totalCategories} 个分类，${totalLinks} 个链接`)
+      loadData()
+      window.dispatchEvent(new CustomEvent('dataImported'))
+    } catch (error) {
+      console.error('Bookmark import error:', error)
+      showError('书签文件解析失败')
+    } finally {
+      setImportingBookmarks(false)
+      if (bookmarkInputRef.current) {
+        bookmarkInputRef.current.value = ''
+      }
     }
   }
 
@@ -314,6 +477,69 @@ export default function SettingsModule() {
               {savingSite ? '保存中...' : '保存设置'}
             </button>
           </form>
+          
+          {/* 最近访问开关 */}
+          <div className="mt-4 pt-4 border-t border-border-main">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-text-main">显示最近访问</div>
+                <div className="text-xs text-text-secondary">在首页显示最近访问的链接</div>
+              </div>
+              <button
+                onClick={() => toggleRecentVisits(!showRecentVisits)}
+                className={`relative w-11 h-6 rounded-full transition-colors ${
+                  showRecentVisits ? 'bg-primary' : 'bg-border-main'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow ${
+                    showRecentVisits ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* 主题配色 */}
+        <section className="bg-bg-card border border-border-main rounded-xl p-5">
+          <h3 className="text-base font-medium text-text-main mb-4 flex items-center gap-2">
+            <SwatchIcon className="w-5 h-5" />
+            主题配色
+          </h3>
+          
+          <div className="grid grid-cols-3 gap-3">
+            {themes.map((theme) => (
+              <button
+                key={theme.id}
+                onClick={() => applyTheme(theme.id)}
+                className={`relative p-3 rounded-xl border-2 transition-all ${
+                  currentTheme === theme.id
+                    ? 'border-primary ring-2 ring-primary/20'
+                    : 'border-border-main hover:border-primary/50'
+                }`}
+              >
+                <div className="flex gap-1 mb-2 justify-center">
+                  {theme.colors.map((color, i) => (
+                    <div
+                      key={i}
+                      className="w-5 h-5 rounded-full border border-gray-200"
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                <div className="text-xs text-text-main font-medium">{theme.name}</div>
+                {currentTheme === theme.id && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="text-xs text-text-secondary mt-3">选择后立即生效，配合深色/浅色模式使用</div>
         </section>
 
         {/* 数据管理 */}
@@ -359,6 +585,26 @@ export default function SettingsModule() {
               导入数据
               <input type="file" accept=".json" onChange={handleImport} className="hidden" />
             </label>
+          </div>
+          
+          {/* 书签导入 */}
+          <div className="mt-4 pt-4 border-t border-border-main">
+            <div className="text-xs text-text-secondary mb-2">从浏览器导入书签</div>
+            <label className={`w-full px-4 py-2.5 bg-bg-main text-text-main border border-border-main rounded-lg hover:bg-hover-bg transition-colors cursor-pointer text-sm flex items-center justify-center gap-2 ${importingBookmarks ? 'opacity-50 pointer-events-none' : ''}`}>
+              <BookmarkIcon className="w-4 h-4" />
+              {importingBookmarks ? '导入中...' : '导入浏览器书签'}
+              <input 
+                ref={bookmarkInputRef}
+                type="file" 
+                accept=".html,.htm" 
+                onChange={handleBookmarkImport} 
+                className="hidden" 
+                disabled={importingBookmarks}
+              />
+            </label>
+            <div className="text-xs text-text-secondary mt-2">
+              支持 Chrome、Edge、Firefox 导出的书签文件（HTML 格式）
+            </div>
           </div>
         </section>
 

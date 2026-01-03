@@ -119,6 +119,8 @@ export interface Link {
   description?: string
   iconUrl?: string
   order: number
+  visitCount: number
+  lastVisitedAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -194,6 +196,11 @@ export const navigationAPI = {
     const response = await api.get(`/api/navigation/search?q=${encodeURIComponent(query)}`)
     return response.data
   },
+
+  recordVisit: async (linkId: string): Promise<{ success: boolean; data?: { visit_count: number; last_visited_at: string }; error?: string }> => {
+    const response = await api.post(`/api/navigation/links/${linkId}/visit`)
+    return response.data
+  },
 }
 
 // Convenience functions for easier use
@@ -223,6 +230,17 @@ export const moveLinkToCategory = async (linkId: string, targetCategoryId: strin
   const response = await navigationAPI.moveLink(linkId, targetCategoryId, newOrder)
   if (!response.success) {
     throw new Error(response.error || 'Failed to move link')
+  }
+}
+
+export const recordLinkVisit = async (linkId: string): Promise<{ visitCount: number; lastVisitedAt: string }> => {
+  const response = await navigationAPI.recordVisit(linkId)
+  if (!response.success || !response.data) {
+    throw new Error(response.error || 'Failed to record visit')
+  }
+  return {
+    visitCount: response.data.visit_count,
+    lastVisitedAt: response.data.last_visited_at
   }
 }
 

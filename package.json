@@ -7,17 +7,20 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "docker:build": "docker build -t qiankui-nav .",
     "docker:run": "docker run -d -p 3000:3000 -v qiankui-data:/app/data qiankui-nav"
   },
   "dependencies": {
     "@fastify/cors": "^8.4.0",
     "@fastify/static": "^6.12.0",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "better-sqlite3": "^9.2.2",
     "dotenv": "^16.3.1",
     "fastify": "^4.24.3",
     "jsonwebtoken": "^9.0.2",
+    "marked": "^17.0.1",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
@@ -26,7 +29,9 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.9.0",
     "@types/uuid": "^9.0.6",
+    "fast-check": "^4.5.3",
     "tsx": "^4.1.4",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "vitest": "^4.0.16"
   }
 }

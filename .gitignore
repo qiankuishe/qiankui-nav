@@ -6,3 +6,5 @@ data/
 *.db-shm
 .env
 .DS_Store
+.kiro/
+.vscode/

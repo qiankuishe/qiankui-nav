@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { getFavicon as getCachedFavicon, setFavicon as cacheFavicon } from '../utils/faviconCache'
 
 interface FaviconImageProps {
   url: string
@@ -30,6 +31,9 @@ export default function FaviconImage({ url, title, className = 'w-7 h-7' }: Favi
   const [sourceIndex, setSourceIndex] = useState(0)
   const [showLetter, setShowLetter] = useState(false)
   const [triedDirect, setTriedDirect] = useState(false)
+  const [cachedDataUrl, setCachedDataUrl] = useState<string | null>(null)
+  const [cacheChecked, setCacheChecked] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
 
   const domain = getDomain(url)
 
@@ -64,14 +68,66 @@ export default function FaviconImage({ url, title, className = 'w-7 h-7' }: Favi
     // 只检测是否太小（≤16px），太小说明是默认图标
     if (img.naturalWidth <= 16) {
       tryNextSource()
+      return
+    }
+    
+    // 成功加载，缓存到 IndexedDB
+    if (!cachedDataUrl && img.src && !img.src.startsWith('data:')) {
+      // 将图片转换为 data URL 并缓存
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0)
+          const dataUrl = canvas.toDataURL('image/png')
+          cacheFavicon(url, dataUrl).catch(() => {})
+        }
+      } catch {
+        // 跨域图片无法转换，忽略
+      }
     }
   }
+
+  // 检查缓存
+  useEffect(() => {
+    let mounted = true
+    
+    const checkCache = async () => {
+      if (!domain) {
+        setCacheChecked(true)
+        return
+      }
+      
+      try {
+        const cached = await getCachedFavicon(url)
+        if (mounted && cached) {
+          setCachedDataUrl(cached)
+        }
+      } catch {
+        // 忽略缓存错误
+      }
+      
+      if (mounted) {
+        setCacheChecked(true)
+      }
+    }
+    
+    checkCache()
+    
+    return () => {
+      mounted = false
+    }
+  }, [url, domain])
 
   // 重置状态当 URL 改变时
   useEffect(() => {
     setSourceIndex(0)
     setShowLetter(false)
     setTriedDirect(false)
+    setCachedDataUrl(null)
+    setCacheChecked(false)
   }, [url])
 
   // 显示字母回退
@@ -87,6 +143,24 @@ export default function FaviconImage({ url, title, className = 'w-7 h-7' }: Favi
     )
   }
 
+  // 如果有缓存，直接使用
+  if (cachedDataUrl) {
+    return (
+      <img
+        src={cachedDataUrl}
+        alt=""
+        className={`${className} rounded object-cover`}
+      />
+    )
+  }
+
+  // 等待缓存检查完成
+  if (!cacheChecked) {
+    return (
+      <div className={`${className} rounded bg-hover-bg animate-pulse`} />
+    )
+  }
+
   // 确定图标源
   let imgSrc = ''
   if (triedDirect && domain) {
@@ -97,9 +171,11 @@ export default function FaviconImage({ url, title, className = 'w-7 h-7' }: Favi
 
   return (
     <img
+      ref={imgRef}
       src={imgSrc}
       alt=""
       className={`${className} rounded object-cover`}
+      crossOrigin="anonymous"
       onError={handleError}
       onLoad={handleLoad}
     />

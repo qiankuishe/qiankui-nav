@@ -37,7 +37,9 @@ export async function navigationRoutes(fastify: FastifyInstance) {
         url: l.url,
         description: l.description,
         iconUrl: l.icon_url,
-        order: l.order
+        order: l.order,
+        visitCount: l.visit_count || 0,
+        lastVisitedAt: l.last_visited_at || null
       }))
     }))
 
@@ -218,6 +220,36 @@ export async function navigationRoutes(fastify: FastifyInstance) {
 
     const link = db.prepare('SELECT * FROM links WHERE id = ? AND user_id = ?').get(linkId, userId)
     return { success: true, data: link }
+  })
+
+  // 记录链接访问
+  fastify.post('/links/:id/visit', async (request: FastifyRequest, reply: FastifyReply) => {
+    const userId = (request as any).user.userId
+    const { id } = request.params as { id: string }
+    
+    const db = getDb()
+    
+    // 验证链接存在且属于当前用户
+    const link = db.prepare('SELECT id, visit_count FROM links WHERE id = ? AND user_id = ?').get(id, userId) as any
+    if (!link) {
+      return reply.status(404).send({ success: false, error: '链接不存在' })
+    }
+    
+    const newVisitCount = (link.visit_count || 0) + 1
+    const now = new Date().toISOString()
+    
+    db.prepare(`
+      UPDATE links SET visit_count = ?, last_visited_at = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ? AND user_id = ?
+    `).run(newVisitCount, now, id, userId)
+
+    return { 
+      success: true, 
+      data: { 
+        visit_count: newVisitCount, 
+        last_visited_at: now 
+      } 
+    }
   })
 
   // 批量删除所有导航数据（分类和链接）

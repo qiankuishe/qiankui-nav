@@ -1,11 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   DocumentTextIcon,
   PlusIcon,
   TrashIcon,
   ChevronLeftIcon,
+  EyeIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/24/outline'
 import { MapPinIcon } from '@heroicons/react/24/solid'
+import { marked } from 'marked'
 import {
   Note,
   getNotes,
@@ -15,6 +18,12 @@ import {
 } from '../utils/notesApi'
 import ConfirmModal from './ConfirmModal'
 import { useEventListener } from '../hooks/useEventListener'
+
+// 配置 marked
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+})
 
 interface NotesModuleProps {
   highlightId?: string | null
@@ -27,6 +36,7 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
   const [saving, setSaving] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean
@@ -121,6 +131,7 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     setSelectedNote(note)
     setEditTitle(note.title)
     setEditContent(note.content)
+    setIsPreviewMode(false)
     pendingContentRef.current = null
   }
 
@@ -128,6 +139,7 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
+    setIsPreviewMode(false)
     // 立即保存
     if (selectedNote && (editTitle !== selectedNote.title || editContent !== selectedNote.content)) {
       try {
@@ -329,24 +341,74 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
       {/* 笔记编辑器 */}
       {selectedNote ? (
         <div className="bg-bg-card border border-border-main rounded-2xl overflow-hidden shadow-sm">
-          <div className="p-6">
+          {/* 编辑器工具栏 */}
+          <div className="px-6 py-3 border-b border-border-main flex items-center justify-between">
             <input
               ref={titleInputRef}
               type="text"
               value={editTitle}
               onChange={(e) => handleTitleChange(e.target.value)}
               placeholder="标题"
-              className="w-full text-xl font-semibold bg-transparent border-none outline-none text-primary placeholder-text-secondary mb-4"
+              className="flex-1 text-xl font-semibold bg-transparent border-none outline-none text-primary placeholder-text-secondary"
+              disabled={isPreviewMode}
             />
-            <textarea
-              value={editContent}
-              onChange={(e) => handleContentChange(e.target.value)}
-              placeholder="开始写点什么..."
-              className="w-full min-h-[400px] bg-transparent border-none outline-none resize-none text-text-main placeholder-text-secondary leading-relaxed"
-            />
+            <div className="flex items-center gap-2 ml-4">
+              <button
+                onClick={() => setIsPreviewMode(false)}
+                className={`px-3 py-1.5 text-sm rounded-lg flex items-center gap-1.5 transition-colors ${
+                  !isPreviewMode 
+                    ? 'bg-primary text-white' 
+                    : 'text-text-secondary hover:bg-hover-bg'
+                }`}
+              >
+                <PencilSquareIcon className="w-4 h-4" />
+                编辑
+              </button>
+              <button
+                onClick={() => setIsPreviewMode(true)}
+                className={`px-3 py-1.5 text-sm rounded-lg flex items-center gap-1.5 transition-colors ${
+                  isPreviewMode 
+                    ? 'bg-primary text-white' 
+                    : 'text-text-secondary hover:bg-hover-bg'
+                }`}
+              >
+                <EyeIcon className="w-4 h-4" />
+                预览
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            {isPreviewMode ? (
+              /* Markdown 预览 */
+              <div 
+                className="prose prose-sm max-w-none min-h-[400px] text-text-main
+                  prose-headings:text-primary prose-headings:font-semibold
+                  prose-p:text-text-main prose-p:leading-relaxed
+                  prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+                  prose-strong:text-text-main prose-strong:font-semibold
+                  prose-code:text-primary prose-code:bg-hover-bg prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
+                  prose-pre:bg-gray-900 prose-pre:text-gray-100
+                  prose-blockquote:border-l-primary prose-blockquote:text-text-secondary
+                  prose-ul:text-text-main prose-ol:text-text-main
+                  prose-li:text-text-main
+                  prose-hr:border-border-main"
+                dangerouslySetInnerHTML={{ 
+                  __html: editContent ? marked(editContent) as string : '<p class="text-text-secondary">暂无内容</p>' 
+                }}
+              />
+            ) : (
+              /* 编辑模式 */
+              <textarea
+                value={editContent}
+                onChange={(e) => handleContentChange(e.target.value)}
+                placeholder="支持 Markdown 语法，如 **粗体**、*斜体*、# 标题、- 列表等..."
+                className="w-full min-h-[400px] bg-transparent border-none outline-none resize-none text-text-main placeholder-text-secondary leading-relaxed font-mono text-sm"
+              />
+            )}
           </div>
           <div className="px-6 py-3 border-t border-border-main bg-hover-bg/30 flex items-center justify-between text-xs text-text-secondary">
-            <span>{editContent.length} 字符</span>
+            <span>{editContent.length} 字符 {isPreviewMode && '· 预览模式'}</span>
             <span className="flex items-center gap-1.5">
               {saving && <SavingSpinner />}
               最后编辑：{formatDate(selectedNote.updated_at)}

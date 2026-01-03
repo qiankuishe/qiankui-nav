@@ -7,17 +7,17 @@
   line-height: 1.5;
   font-weight: 400;
 
-  /* 浅色模式配色 */
-  --bg-color: #faf8f5;        /* 背景色 - 温暖的米白色 */
-  --bg-card: #ffffff;         /* 卡片背景 - 纯白色 */
-  --text-color: #8b6642;      /* 主文字 - 深棕色 */
-  --text-secondary: #a67c52;  /* 次要文字 - 中棕色 */
-  --border-color: #e8dfd3;    /* 边框色 - 浅棕色 */
-  --primary-color: #a67c52;   /* 主色调 - 棕色 */
-  --primary-hover: #8b6642;   /* 主色悬浮 - 深棕色 */
-  --hover-bg: #f5efe8;        /* 悬浮背景 - 浅米色 */
-  --accent-color: #d4a574;    /* 强调色 - 浅棕色 */
-  --shadow-color: rgba(166, 124, 82, 0.1); /* 阴影色 */
+  /* 默认配色 - 温暖棕色 (warm-brown) */
+  --bg-color: #faf8f5;
+  --bg-card: #ffffff;
+  --text-color: #8b6642;
+  --text-secondary: #a67c52;
+  --border-color: #e8dfd3;
+  --primary-color: #a67c52;
+  --primary-hover: #8b6642;
+  --hover-bg: #f5efe8;
+  --accent-color: #d4a574;
+  --shadow-color: rgba(166, 124, 82, 0.1);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -26,18 +26,158 @@
   -webkit-text-size-adjust: 100%;
 }
 
-/* 深色模式配色 - 与qiankui-sub保持一致 */
+/* 配色方案 1: 奶白配黑字 (cream-black) */
+[data-theme="cream-black"] {
+  --bg-color: #fefdfb;
+  --bg-card: #ffffff;
+  --text-color: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --border-color: #e5e5e5;
+  --primary-color: #333333;
+  --primary-hover: #1a1a1a;
+  --hover-bg: #f5f5f5;
+  --accent-color: #666666;
+  --shadow-color: rgba(0, 0, 0, 0.08);
+}
+
+/* 配色方案 2: 海洋蓝 (ocean-blue) */
+[data-theme="ocean-blue"] {
+  --bg-color: #f0f7ff;
+  --bg-card: #ffffff;
+  --text-color: #1e3a5f;
+  --text-secondary: #4a6fa5;
+  --border-color: #d0e3f7;
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --hover-bg: #e8f2ff;
+  --accent-color: #60a5fa;
+  --shadow-color: rgba(59, 130, 246, 0.1);
+}
+
+/* 配色方案 3: 森林绿 (forest-green) */
+[data-theme="forest-green"] {
+  --bg-color: #f0f7f4;
+  --bg-card: #ffffff;
+  --text-color: #1a4d3e;
+  --text-secondary: #3d7a6a;
+  --border-color: #c8e0d8;
+  --primary-color: #059669;
+  --primary-hover: #047857;
+  --hover-bg: #e6f5ef;
+  --accent-color: #34d399;
+  --shadow-color: rgba(5, 150, 105, 0.1);
+}
+
+/* 配色方案 4: 玫瑰粉 (rose-pink) */
+[data-theme="rose-pink"] {
+  --bg-color: #fdf2f4;
+  --bg-card: #ffffff;
+  --text-color: #831843;
+  --text-secondary: #be185d;
+  --border-color: #fce7eb;
+  --primary-color: #ec4899;
+  --primary-hover: #db2777;
+  --hover-bg: #fce7f3;
+  --accent-color: #f472b6;
+  --shadow-color: rgba(236, 72, 153, 0.1);
+}
+
+/* 配色方案 5: 紫罗兰 (violet-purple) */
+[data-theme="violet-purple"] {
+  --bg-color: #f5f3ff;
+  --bg-card: #ffffff;
+  --text-color: #4c1d95;
+  --text-secondary: #6d28d9;
+  --border-color: #e0d7f7;
+  --primary-color: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --hover-bg: #ede9fe;
+  --accent-color: #a78bfa;
+  --shadow-color: rgba(139, 92, 246, 0.1);
+}
+
+/* 深色模式配色 */
 .dark {
-  --bg-color: #1a1612;        /* 背景色 - 深棕黑色 */
-  --bg-card: #252019;         /* 卡片背景 - 深棕色 */
-  --text-color: #d4a574;      /* 主文字 - 浅棕色 */
-  --text-secondary: #b8a68e;  /* 次要文字 - 灰棕色 */
-  --border-color: #3d3229;    /* 边框色 - 中深棕色 */
-  --primary-color: #d4a574;   /* 主色调 - 浅棕色 */
-  --primary-hover: #e8c49a;   /* 主色悬浮 - 更浅棕色 */
-  --hover-bg: #2d261f;        /* 悬浮背景 - 中深棕色 */
-  --accent-color: #a67c52;    /* 强调色 - 中棕色 */
-  --shadow-color: rgba(0, 0, 0, 0.3); /* 阴影色 */
+  --bg-color: #1a1612;
+  --bg-card: #252019;
+  --text-color: #d4a574;
+  --text-secondary: #b8a68e;
+  --border-color: #3d3229;
+  --primary-color: #d4a574;
+  --primary-hover: #e8c49a;
+  --hover-bg: #2d261f;
+  --accent-color: #a67c52;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+}
+
+/* 深色模式 - 奶白配黑字 */
+.dark[data-theme="cream-black"] {
+  --bg-color: #121212;
+  --bg-card: #1e1e1e;
+  --text-color: #f5f5f5;
+  --text-secondary: #a0a0a0;
+  --border-color: #333333;
+  --primary-color: #e0e0e0;
+  --primary-hover: #ffffff;
+  --hover-bg: #2a2a2a;
+  --accent-color: #888888;
+  --shadow-color: rgba(0, 0, 0, 0.4);
+}
+
+/* 深色模式 - 海洋蓝 */
+.dark[data-theme="ocean-blue"] {
+  --bg-color: #0c1929;
+  --bg-card: #132337;
+  --text-color: #93c5fd;
+  --text-secondary: #60a5fa;
+  --border-color: #1e3a5f;
+  --primary-color: #3b82f6;
+  --primary-hover: #60a5fa;
+  --hover-bg: #1a3352;
+  --accent-color: #2563eb;
+  --shadow-color: rgba(59, 130, 246, 0.2);
+}
+
+/* 深色模式 - 森林绿 */
+.dark[data-theme="forest-green"] {
+  --bg-color: #0a1f1a;
+  --bg-card: #122b24;
+  --text-color: #6ee7b7;
+  --text-secondary: #34d399;
+  --border-color: #1a4d3e;
+  --primary-color: #10b981;
+  --primary-hover: #34d399;
+  --hover-bg: #163d32;
+  --accent-color: #059669;
+  --shadow-color: rgba(16, 185, 129, 0.2);
+}
+
+/* 深色模式 - 玫瑰粉 */
+.dark[data-theme="rose-pink"] {
+  --bg-color: #1f0a12;
+  --bg-card: #2d1219;
+  --text-color: #fda4af;
+  --text-secondary: #fb7185;
+  --border-color: #4c1d2d;
+  --primary-color: #f43f5e;
+  --primary-hover: #fb7185;
+  --hover-bg: #3d1522;
+  --accent-color: #e11d48;
+  --shadow-color: rgba(244, 63, 94, 0.2);
+}
+
+/* 深色模式 - 紫罗兰 */
+.dark[data-theme="violet-purple"] {
+  --bg-color: #13091f;
+  --bg-card: #1e1033;
+  --text-color: #c4b5fd;
+  --text-secondary: #a78bfa;
+  --border-color: #3b2066;
+  --primary-color: #8b5cf6;
+  --primary-hover: #a78bfa;
+  --hover-bg: #2a1850;
+  --accent-color: #7c3aed;
+  --shadow-color: rgba(139, 92, 246, 0.2);
 }
 
 body {
@@ -88,4 +228,20 @@ body {
   -ms-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* Tooltip 淡入动画 */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out;
 }

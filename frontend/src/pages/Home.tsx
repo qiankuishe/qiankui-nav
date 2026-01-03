@@ -1,6 +1,7 @@
-    import { useState, useEffect, useRef, useCallback } from 'react'
+    import { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useEventListener } from '../hooks/useEventListener'
+import { useDebounce } from '../hooks/useDebounce'
 import { DragDropProvider, SortableProvider } from '../contexts/DragDropContext'
 import { useDragOperations } from '../hooks/useDragOperations'
 import { useDragFeedback } from '../components/DragFeedback'
@@ -23,15 +24,19 @@ import {
   MoonIcon
 } from '@heroicons/react/24/outline'
 import LinkCard from '../components/LinkCard'
+import VirtualLinkGrid from '../components/VirtualLinkGrid'
 import CategoryDropZone from '../components/CategoryDropZone'
 import SortableCategoryItem from '../components/SortableCategoryItem'
-import NotesModule from '../components/NotesModule'
-import ClipboardModule from '../components/ClipboardModule'
 import SettingsModule from '../components/SettingsModule'
 import ConfirmModal from '../components/ConfirmModal'
 import Footer from '../components/Footer'
-import { LoadingGrid, LinkCardSkeleton } from '../components/SkeletonLoader'
+import { LoadingSpinner, LoadingGrid, LinkCardSkeleton } from '../components/SkeletonLoader'
 import api from '../utils/api'
+
+// 懒加载模块
+const NotesModule = lazy(() => import('../components/NotesModule'))
+const ClipboardModule = lazy(() => import('../components/ClipboardModule'))
+
 import { 
   getCategories,
   updateCategoryOrder,
@@ -80,6 +85,10 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchEngine, setSearchEngine] = useState<keyof typeof searchEngines>('google')
   const [localSearchResults, setLocalSearchResults] = useState<Array<{ type: 'link' | 'note' | 'clipboard'; id: string; title: string; url?: string; desc: string }>>([])
+  const [isSearching, setIsSearching] = useState(false)
+  
+  // 防抖搜索
+  const debouncedSearchQuery = useDebounce(searchQuery, 300)
   
   // 弹窗状态
   const [modal, setModal] = useState<ModalState>({ type: null })
@@ -104,6 +113,11 @@ export default function Home() {
   const [clipboardItems, setClipboardItems] = useState<Array<{ id: string; title: string; content: string; type: string }>>([])
   const highlightedRef = useRef<string | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
+  
+  // 最近访问显示设置
+  const [showRecentVisits, setShowRecentVisits] = useState(() => {
+    return localStorage.getItem('showRecentVisits') !== 'false'
+  })
 
   // 保存 activeTab 到 sessionStorage
   useEffect(() => {
@@ -145,6 +159,16 @@ export default function Home() {
     loadCategories()
     loadSearchData()
   }, []))
+  
+  // 监听最近访问开关变化
+  useEffect(() => {
+    const handleToggle = (e: Event) => {
+      const customEvent = e as CustomEvent
+      setShowRecentVisits(customEvent.detail.show)
+    }
+    window.addEventListener('recentVisitsToggled', handleToggle)
+    return () => window.removeEventListener('recentVisitsToggled', handleToggle)
+  }, [])
   
   // 切换到站内搜索时重新加载数据
   useEffect(() => {
@@ -236,6 +260,18 @@ export default function Home() {
       console.error('Error loading search data:', err)
     }
   }
+
+  // 处理链接访问统计更新
+  const handleVisitUpdate = useCallback((linkId: string, visitCount: number, lastVisitedAt: string) => {
+    setCategories(prev => prev.map(cat => ({
+      ...cat,
+      links: cat.links.map(link => 
+        link.id === linkId 
+          ? { ...link, visitCount, lastVisitedAt }
+          : link
+      )
+    })))
+  }, [])
   
   const handleGlobalNavigate = (type: 'nav' | 'notes' | 'clipboard', targetId: string) => {
     setActiveTab(type)
@@ -356,14 +392,16 @@ export default function Home() {
     setLocalSearchResults(results.slice(0, 20))
   }
   
-  // 监听搜索输入变化，站内搜索时实时搜索
+  // 监听搜索输入变化，站内搜索时实时搜索（使用防抖）
   useEffect(() => {
     if (searchEngine === 'local') {
-      doLocalSearch(searchQuery)
+      setIsSearching(true)
+      doLocalSearch(debouncedSearchQuery)
+      setIsSearching(false)
     } else {
       setLocalSearchResults([])
     }
-  }, [searchQuery, searchEngine, categories, notes, clipboardItems])
+  }, [debouncedSearchQuery, searchEngine, categories, notes, clipboardItems])
   
   // 点击站内搜索结果
   const handleLocalResultClick = (result: { type: 'link' | 'note' | 'clipboard'; id: string; url?: string }) => {
@@ -411,9 +449,9 @@ export default function Home() {
     try {
       if (modal.type === 'addCategory') {
         const result = await navigationAPI.createCategory(formData.name.trim(), categories.length)
-        // 乐观更新：直接添加到本地状态
+        // 重新加载分类以获取完整数据
         if (result.data) {
-          setCategories(prev => [...prev, { id: result.data!.id, name: formData.name.trim(), order: prev.length, links: [] }])
+          await loadCategories()
         }
         showSuccess('分类已添加')
       } else if (modal.type === 'editCategory' && modal.data) {
@@ -471,21 +509,9 @@ export default function Home() {
           description: formData.desc.trim() || undefined,
           order: category ? category.links.length : 0
         })
-        // 乐观更新：直接添加到本地状态
+        // 重新加载分类以获取完整数据
         if (result.data) {
-          const newLink = {
-            id: result.data.id,
-            categoryId: modal.data.categoryId,
-            title: formData.title.trim(),
-            url,
-            description: formData.desc.trim() || undefined,
-            order: category ? category.links.length : 0
-          }
-          setCategories(prev => prev.map(c => 
-            c.id === modal.data.categoryId 
-              ? { ...c, links: [...c.links, newLink] }
-              : c
-          ))
+          await loadCategories()
         }
         showSuccess('链接已添加')
       } else if (modal.type === 'editLink' && modal.data) {
@@ -694,7 +720,11 @@ export default function Home() {
         <div className={`min-h-screen bg-bg-main flex ${isDragInProgress ? 'select-none' : ''}`}>
           {/* 侧边栏 */}
           <aside className={`fixed inset-y-0 left-0 z-40 w-60 bg-bg-card border-r border-border-main flex flex-col transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-            <div className="h-14 flex items-center gap-3 px-4 border-b border-border-main">
+            <div 
+              className="h-14 flex items-center gap-3 px-4 border-b border-border-main cursor-pointer hover:bg-hover-bg transition-colors"
+              onClick={() => window.location.href = '/'}
+              title="返回首页"
+            >
               <img src={logoUrl || '/logo.png'} alt="Logo" className="w-8 h-8 rounded-lg object-contain" />
               <span className="font-semibold text-text-main">{siteName}</span>
             </div>
@@ -707,9 +737,19 @@ export default function Home() {
                   <SortableCategoryItem
                     key={cat.id}
                     category={cat}
-                    isSelected={selectedCategoryId === cat.id}
+                    isSelected={selectedCategoryId === cat.id && activeTab === 'nav'}
                     isEditMode={isEditMode}
-                    onClick={() => setSelectedCategoryId(cat.id)}
+                    onClick={() => {
+                      // 如果不在导航 tab，先切换到导航 tab
+                      if (activeTab !== 'nav') {
+                        setActiveTab('nav')
+                      }
+                      setSelectedCategoryId(cat.id)
+                      // 关闭移动端侧边栏
+                      if (window.innerWidth < 1024) {
+                        setSidebarOpen(false)
+                      }
+                    }}
                   />
                 ))}
               </SortableProvider>
@@ -772,6 +812,11 @@ export default function Home() {
                       {searchEngine !== 'local' && (
                         <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium">搜索</button>
                       )}
+                      {searchEngine === 'local' && isSearching && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+                        </div>
+                      )}
                     </form>
                     
                     {/* 站内搜索结果 */}
@@ -826,6 +871,56 @@ export default function Home() {
                     )}
                   </div>
                   
+                  {/* 最近访问 - 只在非搜索状态且有访问记录时显示 */}
+                  {showRecentVisits && (searchEngine !== 'local' || !searchQuery.trim()) && !selectedCategoryId && !isEditMode && (() => {
+                    const recentLinks = categories
+                      .flatMap(cat => cat.links.map(link => ({ ...link, categoryName: cat.name })))
+                      .filter(link => link.lastVisitedAt)
+                      .sort((a, b) => new Date(b.lastVisitedAt!).getTime() - new Date(a.lastVisitedAt!).getTime())
+                      .slice(0, 8)
+                    
+                    if (recentLinks.length === 0) return null
+                    
+                    return (
+                      <div className="max-w-6xl mx-auto mb-8">
+                        <h2 className="text-sm font-medium text-text-secondary mb-3 flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          最近访问
+                        </h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                          {recentLinks.map(link => (
+                            <a
+                              key={link.id}
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => {
+                                import('../utils/api').then(({ recordLinkVisit }) => {
+                                  recordLinkVisit(link.id).then(data => {
+                                    if (data) handleVisitUpdate(link.id, data.visitCount, data.lastVisitedAt)
+                                  })
+                                })
+                              }}
+                              className="flex items-center gap-2 p-2 bg-bg-card border border-border-main rounded-lg hover:border-primary/30 hover:shadow-sm transition-all group"
+                            >
+                              <img
+                                src={`https://www.google.com/s2/favicons?sz=32&domain=${new URL(link.url).hostname}`}
+                                alt=""
+                                className="w-5 h-5 rounded flex-shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/logo.png'
+                                }}
+                              />
+                              <span className="text-xs text-text-main truncate group-hover:text-primary transition-colors">{link.title}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  
                   {/* 只有非站内搜索或搜索为空时显示分类 */}
                   {(searchEngine !== 'local' || !searchQuery.trim()) && (
                   <div className="max-w-6xl mx-auto space-y-8">
@@ -847,19 +942,21 @@ export default function Home() {
                               </div>
                             )}
                           </div>
-                          <SortableProvider items={cat.links.map(l => l.id)} strategy="horizontal">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                              {cat.links.map(l => (
-                                <div key={l.id} data-search-id={l.id}>
-                                  <LinkCard 
-                                    link={l} 
-                                    isEditMode={isEditMode} 
-                                    onEdit={openEditLink} 
-                                    onDelete={(linkId) => deleteLink(linkId, l.title)} 
-                                  />
-                                </div>
-                              ))}
-                              {isEditMode && (
+                          {/* 编辑模式使用 SortableProvider 支持拖拽，非编辑模式且链接多时使用虚拟滚动 */}
+                          {isEditMode ? (
+                            <SortableProvider items={cat.links.map(l => l.id)} strategy="horizontal">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                                {cat.links.map(l => (
+                                  <div key={l.id} data-search-id={l.id}>
+                                    <LinkCard 
+                                      link={l} 
+                                      isEditMode={isEditMode} 
+                                      onEdit={openEditLink} 
+                                      onDelete={(linkId) => deleteLink(linkId, l.title)}
+                                      onVisitUpdate={handleVisitUpdate}
+                                    />
+                                  </div>
+                                ))}
                                 <button
                                   onClick={() => openAddLink(cat.id)}
                                   className="bg-bg-card border border-dashed border-border-main rounded-lg p-3 text-text-secondary hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
@@ -873,9 +970,20 @@ export default function Home() {
                                     </div>
                                   </div>
                                 </button>
-                              )}
-                            </div>
-                          </SortableProvider>
+                              </div>
+                            </SortableProvider>
+                          ) : (
+                            <VirtualLinkGrid
+                              links={cat.links}
+                              isEditMode={false}
+                              onEdit={openEditLink}
+                              onDelete={(linkId) => {
+                                const link = cat.links.find(l => l.id === linkId)
+                                if (link) deleteLink(linkId, link.title)
+                              }}
+                              onVisitUpdate={handleVisitUpdate}
+                            />
+                          )}
                           {cat.links.length === 0 && !isEditMode && (
                             <div className="text-center py-8 text-text-secondary">此分类暂无链接</div>
                           )}
@@ -905,8 +1013,16 @@ export default function Home() {
                   )}
                 </>
               )}
-              {activeTab === 'notes' && <NotesModule highlightId={highlightId} />}
-              {activeTab === 'clipboard' && <ClipboardModule highlightId={highlightId} />}
+              {activeTab === 'notes' && (
+                <Suspense fallback={<LoadingSpinner />}>
+                  <NotesModule highlightId={highlightId} />
+                </Suspense>
+              )}
+              {activeTab === 'clipboard' && (
+                <Suspense fallback={<LoadingSpinner />}>
+                  <ClipboardModule highlightId={highlightId} />
+                </Suspense>
+              )}
               {activeTab === 'settings' && <SettingsModule />}
             </main>
             <Footer />
