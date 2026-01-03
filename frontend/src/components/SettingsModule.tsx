@@ -487,12 +487,12 @@ export default function SettingsModule() {
               </div>
               <button
                 onClick={() => toggleRecentVisits(!showRecentVisits)}
-                className={`relative w-11 h-6 rounded-full transition-colors ${
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
                   showRecentVisits ? 'bg-primary' : 'bg-border-main'
                 }`}
               >
                 <span
-                  className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow ${
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
                     showRecentVisits ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
