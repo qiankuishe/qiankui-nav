@@ -4,7 +4,7 @@ import { getDb } from '../db.js'
 import { registerAuthMiddleware, getUserId } from '../middleware/auth.js'
 
 export async function navigationRoutes(fastify: FastifyInstance) {
-  // 使用共享认证中间�?
+  // 使用共享认证中间件
   registerAuthMiddleware(fastify)
 
   // 获取所有分类和链接
@@ -126,12 +126,12 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     const { categoryId, title, url, description, order = 0 } = request.body as any
     
     if (!categoryId || !title || !url) {
-      return reply.status(400).send({ success: false, error: '分类、标题、链接不能为�? })
+      return reply.status(400).send({ success: false, error: '分类、标题、链接不能为空' })
     }
 
     const db = getDb()
     
-    // 验证分类是否存在且属于当前用�?
+    // 验证分类是否存在且属于当前用户
     const category = db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?').get(categoryId, userId)
     if (!category) {
       return reply.status(400).send({ success: false, error: '分类不存在，请先创建分类' })
@@ -195,10 +195,10 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     
     const db = getDb()
     
-    // 验证目标分类存在且属于当前用�?
+    // 验证目标分类存在且属于当前用户
     const category = db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?').get(categoryId, userId)
     if (!category) {
-      return reply.status(400).send({ success: false, error: '分类不存�? })
+      return reply.status(400).send({ success: false, error: '分类不存在' })
     }
     
     const stmt = db.prepare('UPDATE links SET "order" = ?, category_id = ? WHERE id = ? AND user_id = ?')
@@ -210,17 +210,17 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     return { success: true }
   })
 
-  // 移动链接到其他分�?
+  // 移动链接到其他分类
   fastify.put('/links/move', async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = getUserId(request)
     const { linkId, targetCategoryId, newOrder } = request.body as { linkId: string; targetCategoryId: string; newOrder: number }
     
     const db = getDb()
     
-    // 验证目标分类存在且属于当前用�?
+    // 验证目标分类存在且属于当前用户
     const targetCategory = db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?').get(targetCategoryId, userId)
     if (!targetCategory) {
-      return reply.status(400).send({ success: false, error: '目标分类不存�? })
+      return reply.status(400).send({ success: false, error: '目标分类不存在' })
     }
     
     db.prepare('UPDATE links SET category_id = ?, "order" = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?')
@@ -237,10 +237,10 @@ export async function navigationRoutes(fastify: FastifyInstance) {
     
     const db = getDb()
     
-    // 验证链接存在且属于当前用�?
+    // 验证链接存在且属于当前用户
     const link = db.prepare('SELECT id, visit_count FROM links WHERE id = ? AND user_id = ?').get(id, userId) as any
     if (!link) {
-      return reply.status(404).send({ success: false, error: '链接不存�? })
+      return reply.status(404).send({ success: false, error: '链接不存在' })
     }
     
     const newVisitCount = (link.visit_count || 0) + 1

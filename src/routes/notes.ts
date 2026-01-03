@@ -4,10 +4,10 @@ import { getDb } from '../db.js'
 import { registerAuthMiddleware, getUserId } from '../middleware/auth.js'
 
 export async function notesRoutes(fastify: FastifyInstance) {
-  // 使用共享认证中间�?
+  // 使用共享认证中间件
   registerAuthMiddleware(fastify)
 
-  // 获取所有笔�?
+  // 获取所有笔记
   fastify.get('/', async (request: FastifyRequest) => {
     const userId = getUserId(request)
     const db = getDb()
@@ -28,7 +28,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
     const note = db.prepare('SELECT * FROM notes WHERE id = ? AND user_id = ?').get(id, userId)
     
     if (!note) {
-      return reply.status(404).send({ success: false, error: '笔记不存�? })
+      return reply.status(404).send({ success: false, error: '笔记不存在' })
     }
 
     return { success: true, data: note }
@@ -43,7 +43,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
     const id = uuidv4()
     db.prepare(`
       INSERT INTO notes (id, user_id, title, content) VALUES (?, ?, ?, ?)
-    `).run(id, userId, title || '无标�?, content || '')
+    `).run(id, userId, title || '无标题', content || '')
 
     const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(id)
     return { success: true, data: note }
@@ -88,7 +88,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
     return { success: true }
   })
 
-  // 批量删除所有笔�?
+  // 批量删除所有笔记
   fastify.delete('/all/items', async (request: FastifyRequest) => {
     const userId = getUserId(request)
     const db = getDb()
