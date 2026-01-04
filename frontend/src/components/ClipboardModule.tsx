@@ -39,7 +39,6 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
     loadItems()
   }, [])
 
-  // 监听数据导入事件
   useEventListener('dataImported', useCallback(() => loadItems(), []))
 
   useEffect(() => {
@@ -66,7 +65,6 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   }
 
   const saveItem = async (item: ClipboardItem) => {
-    // 每个项目独立的防抖
     const existingTimeout = saveTimeoutsRef.current.get(item.id)
     if (existingTimeout) clearTimeout(existingTimeout)
     
@@ -92,7 +90,8 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
     try {
       const response = await api.post('/api/clipboard/items', { type, title: '', content: '' })
       if (response.data?.data) {
-        setItems([response.data.data, ...items])
+        const newItem = response.data.data
+        setItems([newItem, ...items])
         showNotification('success', '已添加')
       }
     } catch (err) {
@@ -101,7 +100,6 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   }
 
   const updateItem = (id: string, updates: Partial<ClipboardItem>) => {
-    // 检查公开便签上限
     if (updates.is_public === 1) {
       const publicCount = items.filter(i => i.is_public === 1 && i.id !== id).length
       if (publicCount >= 16) {
@@ -119,7 +117,8 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
     if (updated) saveItem(updated)
   }
 
-  const copyItem = async (item: ClipboardItem) => {
+  const copyItem = async (item: ClipboardItem, e?: React.MouseEvent) => {
+    e?.stopPropagation()
     try {
       if (item.type === 'image' && item.content) {
         const img = new Image()
@@ -183,9 +182,9 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
 
   const getTypeInfo = (type: string) => {
     switch (type) {
-      case 'code': return { icon: CodeBracketIcon, label: '代码', color: 'text-indigo-500' }
-      case 'image': return { icon: PhotoIcon, label: '图片', color: 'text-pink-500' }
-      default: return { icon: DocumentTextIcon, label: '文本', color: 'text-primary' }
+      case 'code': return { icon: CodeBracketIcon, label: '代码', bgColor: 'bg-indigo-50', textColor: 'text-indigo-600', borderColor: 'border-indigo-200' }
+      case 'image': return { icon: PhotoIcon, label: '图片', bgColor: 'bg-pink-50', textColor: 'text-pink-600', borderColor: 'border-pink-200' }
+      default: return { icon: DocumentTextIcon, label: '文本', bgColor: 'bg-amber-50', textColor: 'text-primary', borderColor: 'border-amber-200' }
     }
   }
 
@@ -263,15 +262,18 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
           {items.map(item => {
             const typeInfo = getTypeInfo(item.type)
             const TypeIcon = typeInfo.icon
+            
             return (
               <div
                 key={item.id}
                 data-search-id={item.id}
-                className={`bg-bg-card border border-border-main rounded-2xl overflow-hidden shadow-sm transition-all duration-300 ${localHighlightId === item.id ? 'search-highlight' : ''}`}
+                className={`bg-bg-card border rounded-xl overflow-hidden transition-all duration-200 ${
+                  localHighlightId === item.id ? 'search-highlight border-primary shadow-md' : 'border-border-main'
+                }`}
               >
                 {/* 头部 */}
-                <div className="p-4 flex items-center gap-2 sm:gap-3">
-                  <span className={`w-8 h-8 rounded-lg bg-hover-bg flex items-center justify-center flex-shrink-0 ${typeInfo.color}`}>
+                <div className={`px-4 py-3 flex items-center gap-3 border-b ${typeInfo.borderColor} ${typeInfo.bgColor}`}>
+                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/80 ${typeInfo.textColor}`}>
                     <TypeIcon className="w-4 h-4" />
                   </span>
                   <input
@@ -279,26 +281,26 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                     value={item.title}
                     onChange={(e) => updateItem(item.id, { title: e.target.value })}
                     placeholder={typeInfo.label}
-                    className="flex-1 min-w-0 text-base font-medium bg-transparent border-none outline-none text-primary placeholder-text-secondary"
+                    className={`flex-1 min-w-0 text-base font-medium bg-transparent border-none outline-none placeholder-text-secondary ${typeInfo.textColor}`}
                   />
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                     <button
-                      onClick={() => updateItem(item.id, { is_public: item.is_public ? 0 : 1 })}
-                      className={`p-1.5 sm:p-2 rounded-lg transition ${item.is_public ? 'text-green-500 bg-green-50 hover:bg-green-100' : 'text-text-secondary hover:bg-hover-bg'}`}
-                      title={item.is_public ? '已公开（点击取消）' : '设为公开便签'}
-                    >
-                      <EyeIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => copyItem(item)}
-                      className="p-1.5 sm:p-2 text-primary hover:bg-primary/10 rounded-lg transition"
+                      onClick={(e) => copyItem(item, e)}
+                      className={`p-1.5 rounded-lg transition ${typeInfo.textColor} hover:bg-white/50`}
                       title="复制"
                     >
                       <DocumentDuplicateIcon className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => updateItem(item.id, { is_public: item.is_public ? 0 : 1 })}
+                      className={`p-1.5 rounded-lg transition ${item.is_public ? 'text-green-600 bg-green-100' : 'text-text-secondary hover:bg-white/50'}`}
+                      title={item.is_public ? '已公开' : '公开'}
+                    >
+                      <EyeIcon className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => setDeleteConfirm({ isOpen: true, id: item.id, title: item.title })}
-                      className="p-1.5 sm:p-2 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                      className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
                       title="删除"
                     >
                       <TrashIcon className="w-4 h-4" />
@@ -307,7 +309,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                 </div>
 
                 {/* 内容区 */}
-                <div className="px-4 pb-4">
+                <div className="p-4">
                   {item.type === 'image' ? (
                     <div>
                       {item.content ? (
@@ -349,8 +351,8 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                   )}
                 </div>
 
-                {/* 底部 */}
-                <div className="px-4 py-3 border-t border-border-main bg-hover-bg/30 flex items-center justify-between text-xs text-text-secondary">
+                {/* 底部信息 */}
+                <div className="px-4 py-2 border-t border-border-main bg-hover-bg/30 flex items-center justify-between text-xs text-text-secondary">
                   <span>{item.content?.length || 0} {item.type === 'image' ? 'bytes' : '字符'}</span>
                   <span>{formatDate(item.updated_at)}</span>
                 </div>
