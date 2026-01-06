@@ -281,7 +281,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                     value={item.title}
                     onChange={(e) => updateItem(item.id, { title: e.target.value })}
                     placeholder={typeInfo.label}
-                    className={`flex-1 min-w-0 text-base font-medium bg-transparent border-none outline-none placeholder-text-secondary ${typeInfo.textColor}`}
+                    className={`flex-1 min-w-0 w-0 text-base font-medium bg-transparent border-none outline-none placeholder-text-secondary ${typeInfo.textColor}`}
                   />
                   <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                     <button
@@ -309,7 +309,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                 </div>
 
                 {/* 内容区 */}
-                <div className="p-4">
+                <div className="p-4 overflow-hidden">
                   {item.type === 'image' ? (
                     <div>
                       {item.content ? (
@@ -338,14 +338,14 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                     <textarea
                       value={item.content}
                       onChange={(e) => updateItem(item.id, { content: e.target.value })}
-                      className="w-full min-h-[120px] bg-gray-900 text-green-400 rounded-xl p-4 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
+                      className="w-full min-h-[120px] bg-gray-900 text-green-400 rounded-xl p-4 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition box-border"
                       placeholder="粘贴代码..."
                     />
                   ) : (
                     <textarea
                       value={item.content}
                       onChange={(e) => updateItem(item.id, { content: e.target.value })}
-                      className="w-full min-h-[100px] bg-hover-bg/50 rounded-xl p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition text-text-main placeholder-text-secondary"
+                      className="w-full min-h-[100px] bg-hover-bg/50 rounded-xl p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition text-text-main placeholder-text-secondary box-border"
                       placeholder="输入文本..."
                     />
                   )}
