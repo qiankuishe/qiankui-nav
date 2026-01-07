@@ -259,7 +259,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
               <div
                 key={item.id}
                 data-search-id={item.id}
-                className={`bg-bg-card border rounded-xl ${
+                className={`bg-bg-card border rounded-2xl overflow-hidden ${
                   localHighlightId === item.id ? 'search-highlight border-primary shadow-md' : 'border-border-main'
                 }`}
               >
