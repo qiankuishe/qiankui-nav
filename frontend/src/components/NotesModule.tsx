@@ -378,14 +378,14 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
       {selectedNote ? (
         <div className="bg-bg-card border border-border-main rounded-2xl overflow-hidden shadow-sm">
           {/* 编辑器工具栏 */}
-          <div className="px-6 py-3 border-b border-border-main flex items-center justify-between">
+          <div className="px-6 py-3 border-b border-border-main flex items-center justify-between overflow-hidden">
             <input
               ref={titleInputRef}
               type="text"
               value={editTitle}
               onChange={(e) => handleTitleChange(e.target.value)}
               placeholder="标题"
-              className="flex-1 text-xl font-semibold bg-transparent border-none outline-none text-primary placeholder-text-secondary"
+              className="flex-1 min-w-0 text-xl font-semibold bg-transparent border-none outline-none text-primary placeholder-text-secondary truncate"
               disabled={isPreviewMode}
             />
             <div className="flex items-center gap-2 ml-4">
