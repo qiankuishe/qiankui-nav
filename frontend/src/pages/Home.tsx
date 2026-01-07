@@ -41,6 +41,7 @@ import {
   getCategories,
   updateCategoryOrder,
   navigationAPI,
+  recordLinkVisit,
   type CategoryWithLinks,
   type Link 
 } from '../utils/api'
@@ -897,10 +898,8 @@ export default function Home() {
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={() => {
-                                import('../utils/api').then(({ recordLinkVisit }) => {
-                                  recordLinkVisit(link.id).then(data => {
-                                    if (data) handleVisitUpdate(link.id, data.visitCount, data.lastVisitedAt)
-                                  })
+                                recordLinkVisit(link.id).then(data => {
+                                  if (data) handleVisitUpdate(link.id, data.visitCount, data.lastVisitedAt)
                                 })
                               }}
                               className="flex items-center gap-2 p-2 bg-bg-card border border-border-main rounded-lg hover:border-primary/30 hover:shadow-sm transition-all group"

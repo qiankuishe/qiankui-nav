@@ -1,14 +1,7 @@
 import api from './api'
 
-export interface Note {
-  id: string
-  user_id: string
-  title: string
-  content: string
-  is_pinned: number
-  created_at: string
-  updated_at: string
-}
+// 从统一类型文件导入
+export type { Note } from '../types'
 
 export interface CreateNoteRequest {
   title: string
@@ -22,7 +15,7 @@ export interface UpdateNoteRequest {
 }
 
 // Get all notes
-export async function getNotes(): Promise<Note[]> {
+export async function getNotes() {
   const response = await api.get('/api/notes')
   return response.data?.data || []
 }

@@ -26,11 +26,11 @@ import {
   type ExportData
 } from '../utils/settingsApi'
 import { useAuth } from '../hooks/useAuth'
-import { useToast } from '../hooks/useToast'
+import { useNotification } from './ui'
 
 export default function SettingsModule() {
   const { logout, user } = useAuth()
-  const { showSuccess, showError, ToastContainer } = useToast()
+  const { showSuccess, showError, ToastContainer } = useNotification()
   const [exportStats, setExportStats] = useState<ExportStats | null>(null)
   const [loading, setLoading] = useState(true)
   

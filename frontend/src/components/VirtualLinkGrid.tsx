@@ -2,7 +2,7 @@ import { memo } from 'react'
 import LinkCard from './LinkCard'
 import { Link } from '../utils/api'
 
-interface VirtualLinkGridProps {
+interface LinkGridProps {
   links: Link[]
   isEditMode: boolean
   onEdit: (link: Link) => void
@@ -11,8 +11,12 @@ interface VirtualLinkGridProps {
   onAddLink?: () => void
 }
 
-// 简化版本：直接渲染所有链接，不使用虚拟滚动
-// react-window v2 API 变化较大，暂时使用普通渲染
+/**
+ * 链接网格组件
+ * 注：原计划使用虚拟滚动优化大量链接的渲染性能，
+ * 但由于 react-window v2 API 变化较大，暂时使用普通渲染。
+ * 对于大多数用户场景（<100个链接），性能影响可忽略。
+ */
 export default memo(function VirtualLinkGrid({
   links,
   isEditMode,
@@ -20,7 +24,7 @@ export default memo(function VirtualLinkGrid({
   onDelete,
   onVisitUpdate,
   onAddLink
-}: VirtualLinkGridProps) {
+}: LinkGridProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
       {links.map(link => (

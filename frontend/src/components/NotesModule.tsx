@@ -10,21 +10,16 @@ import {
 import { MapPinIcon } from '@heroicons/react/24/solid'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import {
-  Note,
-  getNotes,
-  createNote,
-  updateNote,
-  deleteNote,
-} from '../utils/notesApi'
+import { Note, getNotes, createNote, updateNote, deleteNote } from '../utils/notesApi'
 import ConfirmModal from './ConfirmModal'
 import { useEventListener } from '../hooks/useEventListener'
+import { formatDateTimeDetailed } from '../utils/formatters'
+import { useNotification, SavingSpinner, Button, IconButton, Card, EmptyState, PageHeader, RADIUS } from './ui'
 
 marked.setOptions({ breaks: true, gfm: true })
 
 function renderMarkdown(content: string): string {
-  const html = marked(content) as string
-  return DOMPurify.sanitize(html)
+  return DOMPurify.sanitize(marked(content) as string)
 }
 
 interface NotesModuleProps {
@@ -39,15 +34,17 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [isPreviewMode, setIsPreviewMode] = useState(false)
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; noteId: string; noteTitle: string }>({ isOpen: false, noteId: '', noteTitle: '' })
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, noteId: '', noteTitle: '' })
   const [localHighlightId, setLocalHighlightId] = useState<string | null>(null)
+  
   const processedHighlightRef = useRef<string | null>(null)
   const pendingContentRef = useRef<{ title: string; content: string } | null>(null)
   const saveTimeoutRef = useRef<number | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
+  
+  const { showSuccess, showError, ToastContainer } = useNotification()
 
-  const loadNotes = async () => {
+  const loadNotes = useCallback(async () => {
     try {
       setLoading(true)
       const data = await getNotes()
@@ -57,27 +54,27 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadNotes()
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current) }
-  }, [])
+  }, [loadNotes])
 
-  useEventListener('dataImported', useCallback(() => loadNotes(), []))
+  useEventListener('dataImported', loadNotes)
 
   useEffect(() => {
     if (highlightId && notes.length > 0 && processedHighlightRef.current !== highlightId) {
       processedHighlightRef.current = highlightId
       setLocalHighlightId(highlightId)
-      const note = notes.find((n) => n.id === highlightId)
+      const note = notes.find(n => n.id === highlightId)
       if (note) handleSelectNote(note)
       setTimeout(() => setLocalHighlightId(null), 2000)
     }
     if (!highlightId) processedHighlightRef.current = null
   }, [highlightId, notes])
 
-  const autoSave = async (noteId: string, title: string, content: string) => {
+  const autoSave = useCallback(async (noteId: string, title: string, content: string) => {
     pendingContentRef.current = { title, content }
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     setSaving(true)
@@ -86,7 +83,10 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
       try {
         const latestContent = pendingContentRef.current
         if (!latestContent) return
-        const updated = await updateNote(noteId, { title: latestContent.title.trim() || '无标题', content: latestContent.content })
+        const updated = await updateNote(noteId, { 
+          title: latestContent.title.trim() || '无标题', 
+          content: latestContent.content 
+        })
         setNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
         setSelectedNote(prev => prev?.id === updated.id ? updated : prev)
         pendingContentRef.current = null
@@ -96,23 +96,26 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
         setSaving(false)
       }
     }, 800)
-  }
+  }, [])
 
-  const handleSelectNote = (note: Note, isNew: boolean = false) => {
+  const handleSelectNote = useCallback((note: Note, isNew = false) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     setSelectedNote(note)
     setEditTitle(note.title)
     setEditContent(note.content)
     setIsPreviewMode(!isNew)
     pendingContentRef.current = null
-  }
+  }, [])
 
-  const handleBack = async () => {
+  const handleBack = useCallback(async () => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     setIsPreviewMode(false)
     if (selectedNote && (editTitle !== selectedNote.title || editContent !== selectedNote.content)) {
       try {
-        const updated = await updateNote(selectedNote.id, { title: editTitle.trim() || '无标题', content: editContent })
+        const updated = await updateNote(selectedNote.id, { 
+          title: editTitle.trim() || '无标题', 
+          content: editContent 
+        })
         setNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
       } catch (err) {
         console.error('Error saving note:', err)
@@ -121,9 +124,9 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     setSelectedNote(null)
     pendingContentRef.current = null
     setSaving(false)
-  }
+  }, [selectedNote, editTitle, editContent])
 
-  const handleCreateNote = async () => {
+  const handleCreateNote = useCallback(async () => {
     try {
       setSaving(true)
       const newNote = await createNote({ title: '新笔记', content: '' })
@@ -135,110 +138,86 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     } finally {
       setSaving(false)
     }
-  }
+  }, [handleSelectNote])
 
-  const handleSaveAndPreview = async () => {
+  const handleSaveAndPreview = useCallback(async () => {
     if (!selectedNote) return
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     setSaving(true)
     try {
       const latestContent = pendingContentRef.current || { title: editTitle, content: editContent }
-      const updated = await updateNote(selectedNote.id, { title: latestContent.title.trim() || '无标题', content: latestContent.content })
+      const updated = await updateNote(selectedNote.id, { 
+        title: latestContent.title.trim() || '无标题', 
+        content: latestContent.content 
+      })
       setNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
       setSelectedNote(updated)
       pendingContentRef.current = null
       setIsPreviewMode(true)
-      showNotification('success', '已保存')
+      showSuccess('已保存')
     } catch (err) {
       console.error('Error saving note:', err)
-      showNotification('error', '保存失败')
+      showError('保存失败')
     } finally {
       setSaving(false)
     }
-  }
+  }, [selectedNote, editTitle, editContent, showSuccess, showError])
 
-  const handleTitleChange = (value: string) => {
+  const handleTitleChange = useCallback((value: string) => {
     setEditTitle(value)
     if (selectedNote) autoSave(selectedNote.id, value, editContent)
-  }
+  }, [selectedNote, editContent, autoSave])
 
-  const handleContentChange = (value: string) => {
+  const handleContentChange = useCallback((value: string) => {
     setEditContent(value)
     if (selectedNote) autoSave(selectedNote.id, editTitle, value)
-  }
+  }, [selectedNote, editTitle, autoSave])
 
-  const handleTogglePin = async (e?: React.MouseEvent) => {
+  const handleTogglePin = useCallback(async (e?: React.MouseEvent) => {
     e?.stopPropagation()
     if (!selectedNote) return
     try {
       const newPinned = selectedNote.is_pinned ? 0 : 1
       const updated = await updateNote(selectedNote.id, { is_pinned: newPinned })
       setSelectedNote(updated)
-      let newNotes = notes.map(n => n.id === updated.id ? updated : n)
-      newNotes = [...newNotes].sort((a, b) => b.is_pinned - a.is_pinned)
-      setNotes(newNotes)
-      showNotification('success', newPinned ? '已置顶' : '已取消置顶')
+      setNotes(prev => [...prev.map(n => n.id === updated.id ? updated : n)].sort((a, b) => b.is_pinned - a.is_pinned))
+      showSuccess(newPinned ? '已置顶' : '已取消置顶')
     } catch (err) {
       console.error('Error toggling pin:', err)
-      showNotification('error', '操作失败')
+      showError('操作失败')
     }
-  }
+  }, [selectedNote, showSuccess, showError])
 
-  const handleDeleteNote = (noteId: string, noteTitle: string, e?: React.MouseEvent) => {
+  const handleDeleteNote = useCallback((noteId: string, noteTitle: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
     setDeleteConfirm({ isOpen: true, noteId, noteTitle })
-  }
+  }, [])
 
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    setNotification({ type, message })
-    setTimeout(() => setNotification(null), 2000)
-  }
-
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     try {
       await deleteNote(deleteConfirm.noteId)
       if (selectedNote?.id === deleteConfirm.noteId) setSelectedNote(null)
       await loadNotes()
-      showNotification('success', '已删除')
+      showSuccess('已删除')
     } catch (err) {
       console.error('Error deleting note:', err)
-      showNotification('error', '删除失败')
+      showError('删除失败')
     } finally {
       setDeleteConfirm({ isOpen: false, noteId: '', noteTitle: '' })
     }
-  }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
-    if (diffInHours < 24) return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-    if (diffInHours < 24 * 7) return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-  }
-
-  const SavingSpinner = () => (
-    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-    </svg>
-  )
+  }, [deleteConfirm.noteId, selectedNote?.id, loadNotes, showSuccess, showError])
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
       </div>
     )
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-0">
-      {notification && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-white text-sm shadow-lg ${notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
-          {notification.message}
-        </div>
-      )}
+    <div className="w-full lg:max-w-3xl mx-auto sm:px-2" style={{ overflow: 'hidden' }}>
+      <ToastContainer />
 
       <ConfirmModal
         isOpen={deleteConfirm.isOpen}
@@ -250,60 +229,49 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
         onCancel={() => setDeleteConfirm({ isOpen: false, noteId: '', noteTitle: '' })}
       />
 
-      {/* 标题栏 */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-lg font-semibold text-text-main">
-          {selectedNote ? (
-            <button onClick={handleBack} className="flex items-center gap-2 hover:text-primary transition-colors">
-              <ChevronLeftIcon className="w-5 h-5" />
-              <span>返回列表</span>
-            </button>
-          ) : (
-            `我的笔记 (${notes.length})`
-          )}
-        </h2>
-        {!selectedNote && (
-          <button 
-            onClick={handleCreateNote} 
-            disabled={saving}
-            className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-hover transition-all text-sm font-medium flex items-center gap-2 disabled:opacity-50 shadow-sm"
-          >
-            <PlusIcon className="w-4 h-4" />
-            新建
+      <PageHeader
+        title="我的笔记"
+        count={selectedNote ? undefined : notes.length}
+        backButton={selectedNote ? (
+          <button onClick={handleBack} className="flex items-center gap-2 hover:text-primary transition-colors">
+            <ChevronLeftIcon className="w-5 h-5 flex-shrink-0" />
+            <span>返回列表</span>
           </button>
-        )}
-        {selectedNote && (
-          <div className="flex items-center gap-2">
-            {saving && (
-              <span className="text-xs text-text-secondary flex items-center gap-1.5">
-                <SavingSpinner />
-                <span className="hidden sm:inline">保存中...</span>
-              </span>
-            )}
-            <button 
-              onClick={handleTogglePin}
-              className={`p-2 sm:px-3 sm:py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
-                selectedNote.is_pinned ? 'text-amber-500 bg-amber-50 hover:bg-amber-100' : 'text-text-secondary hover:bg-hover-bg'
-              }`}
-            >
-              <MapPinIcon className="w-4 h-4" />
-              <span className="hidden sm:inline">{selectedNote.is_pinned ? '已置顶' : '置顶'}</span>
-            </button>
-            <button 
-              onClick={() => handleDeleteNote(selectedNote.id, selectedNote.title)}
-              className="p-2 sm:px-3 sm:py-1.5 text-sm text-red-500 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1.5"
-            >
-              <TrashIcon className="w-4 h-4" />
-              <span className="hidden sm:inline">删除</span>
-            </button>
-          </div>
-        )}
-      </div>
+        ) : undefined}
+        action={
+          !selectedNote ? (
+            <Button onClick={handleCreateNote} disabled={saving} icon={<PlusIcon className="w-4 h-4" />}>
+              新建
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {saving && (
+                <span className="text-xs text-text-secondary flex items-center gap-1.5">
+                  <SavingSpinner />
+                  <span className="hidden sm:inline">保存中...</span>
+                </span>
+              )}
+              <IconButton 
+                onClick={handleTogglePin}
+                variant={selectedNote.is_pinned ? 'warning' : 'default'}
+                title={selectedNote.is_pinned ? '取消置顶' : '置顶'}
+              >
+                <MapPinIcon className="w-4 h-4" />
+              </IconButton>
+              <IconButton 
+                onClick={() => handleDeleteNote(selectedNote.id, selectedNote.title)}
+                variant="danger"
+                title="删除"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </IconButton>
+            </div>
+          )
+        }
+      />
 
-      {/* 笔记编辑器 */}
       {selectedNote ? (
-        <div className="bg-bg-card border border-border-main rounded-2xl shadow-sm">
-          {/* 编辑器工具栏 */}
+        <Card padding="none" className="overflow-hidden">
           <div className="px-3 sm:px-6 py-3 border-b border-border-main">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex-1 min-w-0">
@@ -314,46 +282,31 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="标题"
                   className="w-full text-lg sm:text-xl font-semibold bg-transparent border-none outline-none text-primary placeholder-text-secondary"
+                  style={{ textOverflow: 'ellipsis' }}
                   disabled={isPreviewMode}
                 />
               </div>
-              <div className="flex-shrink-0">
-                <button
-                  onClick={isPreviewMode ? () => setIsPreviewMode(false) : handleSaveAndPreview}
-                  disabled={!isPreviewMode && saving}
-                  className="px-3 py-1.5 text-sm rounded-lg flex items-center gap-1.5 transition-colors bg-primary text-white disabled:opacity-50"
-                >
-                  {isPreviewMode ? (
-                    <>
-                      <PencilSquareIcon className="w-4 h-4" />
-                      <span className="hidden sm:inline">编辑</span>
-                    </>
-                  ) : saving ? (
-                    <>
-                      <SavingSpinner />
-                      <span className="hidden sm:inline">保存中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckIcon className="w-4 h-4" />
-                      <span className="hidden sm:inline">保存</span>
-                    </>
-                  )}
-                </button>
-              </div>
+              <Button
+                onClick={isPreviewMode ? () => setIsPreviewMode(false) : handleSaveAndPreview}
+                disabled={!isPreviewMode && saving}
+                size="sm"
+                icon={isPreviewMode ? <PencilSquareIcon className="w-4 h-4" /> : saving ? <SavingSpinner /> : <CheckIcon className="w-4 h-4" />}
+              >
+                <span className="hidden sm:inline">{isPreviewMode ? '编辑' : saving ? '保存中...' : '保存'}</span>
+              </Button>
             </div>
           </div>
           
           <div className="p-3 sm:p-6">
             {isPreviewMode ? (
               <div 
-                className="prose prose-sm max-w-none min-h-[300px] sm:min-h-[400px] text-text-main break-words
+                className="prose prose-sm max-w-none min-h-[300px] sm:min-h-[400px] text-text-main break-words overflow-hidden
                   prose-headings:text-primary prose-headings:font-semibold
                   prose-p:text-text-main prose-p:leading-relaxed
                   prose-a:text-primary prose-a:no-underline hover:prose-a:underline
                   prose-strong:text-text-main prose-strong:font-semibold
-                  prose-code:text-primary prose-code:bg-hover-bg prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
-                  prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:overflow-x-auto
+                  prose-code:text-primary prose-code:bg-hover-bg prose-code:px-1 prose-code:py-0.5 prose-code:rounded-lg prose-code:text-sm
+                  prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:overflow-x-auto prose-pre:rounded-xl
                   prose-blockquote:border-l-primary prose-blockquote:text-text-secondary
                   prose-ul:text-text-main prose-ol:text-text-main prose-li:text-text-main
                   prose-hr:border-border-main"
@@ -364,7 +317,7 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
                 value={editContent}
                 onChange={(e) => handleContentChange(e.target.value)}
                 placeholder="支持 Markdown 语法..."
-                className="block w-full min-h-[300px] sm:min-h-[400px] bg-transparent border-none outline-none resize-none text-text-main placeholder-text-secondary leading-relaxed font-mono text-sm"
+                className={`block w-full min-h-[300px] sm:min-h-[400px] bg-transparent border-none outline-none resize-none text-text-main placeholder-text-secondary leading-relaxed font-mono text-sm`}
               />
             )}
           </div>
@@ -372,61 +325,73 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
             <span>{editContent.length} 字符 {isPreviewMode && '· 预览模式'}</span>
             <span className="flex items-center gap-1.5">
               {saving && <SavingSpinner />}
-              <span className="hidden sm:inline">最后编辑：</span>{formatDate(selectedNote.updated_at)}
+              <span className="hidden sm:inline">最后编辑：</span>{formatDateTimeDetailed(selectedNote.updated_at)}
             </span>
           </div>
-        </div>
-      ) : (
-        /* 笔记列表 */
-        notes.length === 0 ? (
-          <div className="bg-bg-card border border-border-main rounded-2xl p-12 text-center">
-            <DocumentTextIcon className="w-16 h-16 mx-auto text-text-secondary/50 mb-4" />
-            <p className="text-text-secondary mb-6">暂无笔记</p>
-            <button 
-              onClick={handleCreateNote}
-              disabled={saving}
-              className="px-5 py-2.5 bg-primary text-white rounded-xl hover:bg-primary-hover transition-all text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50 shadow-sm"
-            >
-              <PlusIcon className="w-4 h-4" />
+        </Card>
+      ) : notes.length === 0 ? (
+        <EmptyState
+          icon={<DocumentTextIcon className="w-16 h-16" />}
+          title="暂无笔记"
+          action={
+            <Button onClick={handleCreateNote} disabled={saving} icon={<PlusIcon className="w-4 h-4" />}>
               创建第一篇笔记
-            </button>
-          </div>
-        ) : (
-          <div className="bg-bg-card border border-border-main rounded-2xl shadow-sm divide-y divide-border-main">
-            {notes.map(note => (
-              <div
-                key={note.id}
-                data-search-id={note.id}
-                onClick={() => handleSelectNote(note)}
-                className={`p-3 sm:p-4 cursor-pointer hover:bg-hover-bg transition-all group ${localHighlightId === note.id ? 'search-highlight' : ''}`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <h3 className="font-medium text-primary mb-1 flex items-center gap-1.5">
-                      {note.is_pinned === 1 && <MapPinIcon className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
-                      <span className="break-all line-clamp-1">{note.title || '无标题'}</span>
-                    </h3>
-                    <p className="text-sm text-text-secondary line-clamp-2 break-all">
-                      {note.content || '暂无内容'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs text-text-secondary/70 bg-hover-bg px-2 py-1 rounded-lg hidden sm:inline">
-                      {formatDate(note.updated_at)}
-                    </span>
-                    <button
-                      onClick={(e) => handleDeleteNote(note.id, note.title, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
+            </Button>
+          }
+        />
+      ) : (
+        <Card padding="none" className="divide-y divide-border-main overflow-hidden">
+          {notes.map(note => (
+            <NoteListItem
+              key={note.id}
+              note={note}
+              isHighlighted={localHighlightId === note.id}
+              onSelect={handleSelectNote}
+              onDelete={handleDeleteNote}
+            />
+          ))}
+        </Card>
       )}
+    </div>
+  )
+}
+
+interface NoteListItemProps {
+  note: Note
+  isHighlighted: boolean
+  onSelect: (note: Note) => void
+  onDelete: (noteId: string, noteTitle: string, e?: React.MouseEvent) => void
+}
+
+function NoteListItem({ note, isHighlighted, onSelect, onDelete }: NoteListItemProps) {
+  return (
+    <div
+      data-search-id={note.id}
+      onClick={() => onSelect(note)}
+      className={`p-3 sm:p-4 cursor-pointer hover:bg-hover-bg transition-all group ${isHighlighted ? 'search-highlight' : ''}`}
+    >
+      <div className="flex items-center gap-1.5 mb-1">
+        {note.is_pinned === 1 && <MapPinIcon className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
+        <h3 
+          className="font-medium text-primary"
+          style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 'calc(100vw - 100px)' }}
+        >
+          {note.title || '无标题'}
+        </h3>
+      </div>
+      <p className="text-sm text-text-secondary line-clamp-2 mb-2" style={{ wordBreak: 'break-word' }}>
+        {note.content || '暂无内容'}
+      </p>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-text-secondary/70">{formatDateTimeDetailed(note.updated_at)}</span>
+        <IconButton
+          onClick={(e) => onDelete(note.id, note.title, e)}
+          variant="danger"
+          className="opacity-0 group-hover:opacity-100"
+        >
+          <TrashIcon className="w-4 h-4" />
+        </IconButton>
+      </div>
     </div>
   )
 }
