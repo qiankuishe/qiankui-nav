@@ -302,7 +302,7 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto overflow-hidden">
+    <div className="max-w-3xl mx-auto" style={{ overflow: 'hidden' }}>
       {notification && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-white text-sm shadow-lg ${notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
           {notification.message}

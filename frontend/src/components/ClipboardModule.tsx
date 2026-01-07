@@ -197,7 +197,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto overflow-hidden">
+    <div className="max-w-3xl mx-auto" style={{ overflow: 'hidden' }}>
       <ConfirmModal
         isOpen={deleteConfirm.isOpen}
         title="删除项目"
