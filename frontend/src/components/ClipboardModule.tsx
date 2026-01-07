@@ -35,9 +35,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   const saveTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [localHighlightId, setLocalHighlightId] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadItems()
-  }, [])
+  useEffect(() => { loadItems() }, [])
 
   useEventListener('dataImported', useCallback(() => loadItems(), []))
 
@@ -71,10 +69,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
     const timeout = setTimeout(async () => {
       try {
         await api.put(`/api/clipboard/items/${item.id}`, {
-          type: item.type,
-          title: item.title,
-          content: item.content,
-          is_public: item.is_public,
+          type: item.type, title: item.title, content: item.content, is_public: item.is_public,
         })
       } catch (err) {
         console.error('Error saving item:', err)
@@ -90,11 +85,10 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
     try {
       const response = await api.post('/api/clipboard/items', { type, title: '', content: '' })
       if (response.data?.data) {
-        const newItem = response.data.data
-        setItems([newItem, ...items])
+        setItems([response.data.data, ...items])
         showNotification('success', '已添加')
       }
-    } catch (err) {
+    } catch {
       showNotification('error', '添加失败')
     }
   }
@@ -107,11 +101,9 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
         return
       }
     }
-
     const newItems = items.map(item => 
       item.id === id ? { ...item, ...updates, updated_at: new Date().toISOString() } : item
     )
-    
     setItems(newItems)
     const updated = newItems.find(i => i.id === id)
     if (updated) saveItem(updated)
@@ -197,7 +189,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto" style={{ overflow: 'hidden' }}>
+    <div className="w-full max-w-3xl mx-auto px-0">
       <ConfirmModal
         isOpen={deleteConfirm.isOpen}
         title="删除项目"
@@ -267,49 +259,53 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
               <div
                 key={item.id}
                 data-search-id={item.id}
-                className={`bg-bg-card border rounded-xl overflow-hidden transition-all duration-200 ${
+                className={`bg-bg-card border rounded-xl ${
                   localHighlightId === item.id ? 'search-highlight border-primary shadow-md' : 'border-border-main'
                 }`}
               >
                 {/* 头部 */}
-                <div className={`px-4 py-3 flex items-center gap-3 border-b overflow-hidden ${typeInfo.borderColor} ${typeInfo.bgColor}`}>
-                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/80 ${typeInfo.textColor}`}>
-                    <TypeIcon className="w-4 h-4" />
-                  </span>
-                  <input
-                    type="text"
-                    value={item.title}
-                    onChange={(e) => updateItem(item.id, { title: e.target.value })}
-                    placeholder={typeInfo.label}
-                    className={`flex-1 min-w-0 text-base font-medium bg-transparent border-none outline-none placeholder-text-secondary truncate ${typeInfo.textColor}`}
-                  />
-                  <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                    <button
-                      onClick={(e) => copyItem(item, e)}
-                      className={`p-1.5 rounded-lg transition ${typeInfo.textColor} hover:bg-white/50`}
-                      title="复制"
-                    >
-                      <DocumentDuplicateIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => updateItem(item.id, { is_public: item.is_public ? 0 : 1 })}
-                      className={`p-1.5 rounded-lg transition ${item.is_public ? 'text-green-600 bg-green-100' : 'text-text-secondary hover:bg-white/50'}`}
-                      title={item.is_public ? '已公开' : '公开'}
-                    >
-                      <EyeIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm({ isOpen: true, id: item.id, title: item.title })}
-                      className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
-                      title="删除"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
+                <div className={`px-3 sm:px-4 py-3 border-b ${typeInfo.borderColor} ${typeInfo.bgColor}`}>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/80 ${typeInfo.textColor}`}>
+                      <TypeIcon className="w-4 h-4" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={item.title}
+                        onChange={(e) => updateItem(item.id, { title: e.target.value })}
+                        placeholder={typeInfo.label}
+                        className={`w-full text-base font-medium bg-transparent border-none outline-none placeholder-text-secondary ${typeInfo.textColor}`}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={(e) => copyItem(item, e)}
+                        className={`p-1.5 rounded-lg transition ${typeInfo.textColor} hover:bg-white/50`}
+                        title="复制"
+                      >
+                        <DocumentDuplicateIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => updateItem(item.id, { is_public: item.is_public ? 0 : 1 })}
+                        className={`p-1.5 rounded-lg transition ${item.is_public ? 'text-green-600 bg-green-100' : 'text-text-secondary hover:bg-white/50'}`}
+                        title={item.is_public ? '已公开' : '公开'}
+                      >
+                        <EyeIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm({ isOpen: true, id: item.id, title: item.title })}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+                        title="删除"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {/* 内容区 */}
-                <div className="p-4 overflow-hidden">
+                <div className="p-3 sm:p-4">
                   {item.type === 'image' ? (
                     <div>
                       {item.content ? (
@@ -338,21 +334,21 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                     <textarea
                       value={item.content}
                       onChange={(e) => updateItem(item.id, { content: e.target.value })}
-                      className="w-full min-h-[120px] bg-gray-900 text-green-400 rounded-xl p-4 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition box-border"
+                      className="block w-full min-h-[120px] bg-gray-900 text-green-400 rounded-xl p-3 sm:p-4 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                       placeholder="粘贴代码..."
                     />
                   ) : (
                     <textarea
                       value={item.content}
                       onChange={(e) => updateItem(item.id, { content: e.target.value })}
-                      className="w-full min-h-[100px] bg-hover-bg/50 rounded-xl p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition text-text-main placeholder-text-secondary box-border"
+                      className="block w-full min-h-[100px] bg-hover-bg/50 rounded-xl p-3 sm:p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 text-text-main placeholder-text-secondary"
                       placeholder="输入文本..."
                     />
                   )}
                 </div>
 
                 {/* 底部信息 */}
-                <div className="px-4 py-2 border-t border-border-main bg-hover-bg/30 flex items-center justify-between text-xs text-text-secondary">
+                <div className="px-3 sm:px-4 py-2 border-t border-border-main bg-hover-bg/30 flex items-center justify-between text-xs text-text-secondary">
                   <span>{item.content?.length || 0} {item.type === 'image' ? 'bytes' : '字符'}</span>
                   <span>{formatDate(item.updated_at)}</span>
                 </div>
