@@ -4,8 +4,8 @@ import {
   PlusIcon,
   TrashIcon,
   ChevronLeftIcon,
-  EyeIcon,
   PencilSquareIcon,
+  CheckIcon,
 } from '@heroicons/react/24/outline'
 import { MapPinIcon } from '@heroicons/react/24/solid'
 import { marked } from 'marked'
@@ -130,7 +130,7 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     }, 800)
   }
 
-  const handleSelectNote = (note: Note) => {
+  const handleSelectNote = (note: Note, isNew: boolean = false) => {
     // 立即保存当前笔记
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
@@ -138,7 +138,8 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
     setSelectedNote(note)
     setEditTitle(note.title)
     setEditContent(note.content)
-    setIsPreviewMode(false)
+    // 新建笔记进入编辑模式，已有笔记进入预览模式
+    setIsPreviewMode(!isNew)
     pendingContentRef.current = null
   }
 
@@ -169,12 +170,40 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
       setSaving(true)
       const newNote = await createNote({ title: '新笔记', content: '' })
       setNotes(prev => [newNote, ...prev])
-      setSelectedNote(newNote)
-      setEditTitle(newNote.title)
-      setEditContent(newNote.content)
+      handleSelectNote(newNote, true)
       setTimeout(() => titleInputRef.current?.select(), 100)
     } catch (err) {
       console.error('Error creating note:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // 保存并切换到预览模式
+  const handleSaveAndPreview = async () => {
+    if (!selectedNote) return
+    
+    // 清除自动保存定时器
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    
+    // 立即保存
+    setSaving(true)
+    try {
+      const latestContent = pendingContentRef.current || { title: editTitle, content: editContent }
+      const updated = await updateNote(selectedNote.id, { 
+        title: latestContent.title.trim() || '无标题', 
+        content: latestContent.content 
+      })
+      setNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
+      setSelectedNote(updated)
+      pendingContentRef.current = null
+      setIsPreviewMode(true)
+      showNotification('success', '已保存')
+    } catch (err) {
+      console.error('Error saving note:', err)
+      showNotification('error', '保存失败')
     } finally {
       setSaving(false)
     }
@@ -361,26 +390,26 @@ export default function NotesModule({ highlightId }: NotesModuleProps) {
             />
             <div className="flex items-center gap-2 ml-4">
               <button
-                onClick={() => setIsPreviewMode(false)}
-                className={`px-3 py-1.5 text-sm rounded-lg flex items-center gap-1.5 transition-colors ${
-                  !isPreviewMode 
-                    ? 'bg-primary text-white' 
-                    : 'text-text-secondary hover:bg-hover-bg'
-                }`}
+                onClick={isPreviewMode ? () => setIsPreviewMode(false) : handleSaveAndPreview}
+                disabled={!isPreviewMode && saving}
+                className="px-3 py-1.5 text-sm rounded-lg flex items-center gap-1.5 transition-colors bg-primary text-white disabled:opacity-50"
               >
-                <PencilSquareIcon className="w-4 h-4" />
-                编辑
-              </button>
-              <button
-                onClick={() => setIsPreviewMode(true)}
-                className={`px-3 py-1.5 text-sm rounded-lg flex items-center gap-1.5 transition-colors ${
-                  isPreviewMode 
-                    ? 'bg-primary text-white' 
-                    : 'text-text-secondary hover:bg-hover-bg'
-                }`}
-              >
-                <EyeIcon className="w-4 h-4" />
-                预览
+                {isPreviewMode ? (
+                  <>
+                    <PencilSquareIcon className="w-4 h-4" />
+                    <span className="hidden sm:inline">编辑</span>
+                  </>
+                ) : saving ? (
+                  <>
+                    <SavingSpinner />
+                    <span className="hidden sm:inline">保存中...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckIcon className="w-4 h-4" />
+                    <span className="hidden sm:inline">保存</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
