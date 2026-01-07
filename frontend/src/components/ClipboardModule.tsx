@@ -197,7 +197,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto overflow-x-hidden">
+    <div className="max-w-3xl mx-auto overflow-hidden">
       <ConfirmModal
         isOpen={deleteConfirm.isOpen}
         title="删除项目"
@@ -272,7 +272,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                 }`}
               >
                 {/* 头部 */}
-                <div className={`px-4 py-3 flex items-center gap-3 border-b ${typeInfo.borderColor} ${typeInfo.bgColor}`}>
+                <div className={`px-4 py-3 flex items-center gap-3 border-b overflow-hidden ${typeInfo.borderColor} ${typeInfo.bgColor}`}>
                   <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/80 ${typeInfo.textColor}`}>
                     <TypeIcon className="w-4 h-4" />
                   </span>
@@ -281,7 +281,7 @@ export default function ClipboardModule({ highlightId }: ClipboardModuleProps) {
                     value={item.title}
                     onChange={(e) => updateItem(item.id, { title: e.target.value })}
                     placeholder={typeInfo.label}
-                    className={`flex-1 min-w-0 w-0 text-base font-medium bg-transparent border-none outline-none placeholder-text-secondary ${typeInfo.textColor}`}
+                    className={`flex-1 min-w-0 text-base font-medium bg-transparent border-none outline-none placeholder-text-secondary truncate ${typeInfo.textColor}`}
                   />
                   <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                     <button
