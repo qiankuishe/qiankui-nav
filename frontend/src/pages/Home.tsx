@@ -21,7 +21,8 @@ import {
   PlusIcon,
   XMarkIcon,
   SunIcon,
-  MoonIcon
+  MoonIcon,
+  ChevronUpIcon
 } from '@heroicons/react/24/outline'
 import LinkCard from '../components/LinkCard'
 import VirtualLinkGrid from '../components/VirtualLinkGrid'
@@ -73,6 +74,27 @@ export default function Home() {
   const { user } = useAuth()
   const [categories, setCategories] = useState<CategoryWithLinks[]>([])
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  
+  // 平滑滚动到分类
+  const scrollToCategory = useCallback((categoryId: string | null) => {
+    setSelectedCategoryId(categoryId)
+    
+    if (categoryId === null) {
+      // 滚动到顶部
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      // 滚动到对应分类
+      const element = document.getElementById(`category-${categoryId}`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+    
+    // 移动端关闭侧边栏
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false)
+    }
+  }, [])
   const [isEditMode, setIsEditMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -115,20 +137,28 @@ export default function Home() {
   const highlightedRef = useRef<string | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
   
+  // 跳过滚动位置恢复的标志（用于从其他 tab 点击分类跳转时）
+  const skipScrollRestoreRef = useRef(false)
+  
   // 最近访问显示设置
   const [showRecentVisits, setShowRecentVisits] = useState(() => {
     return localStorage.getItem('showRecentVisits') !== 'false'
   })
+  
+  // 回到顶部按钮显示状态（移动端）
+  const [showBackToTop, setShowBackToTop] = useState(false)
 
   // 保存 activeTab 到 sessionStorage
   useEffect(() => {
     sessionStorage.setItem('activeTab', activeTab)
   }, [activeTab])
 
-  // 保存滚动位置
+  // 保存滚动位置 & 回到顶部按钮显示
   useEffect(() => {
     const handleScroll = () => {
       sessionStorage.setItem(`scrollPos_${activeTab}`, String(window.scrollY))
+      // 滚动超过 300px 显示回到顶部按钮
+      setShowBackToTop(window.scrollY > 300)
     }
     
     window.addEventListener('scroll', handleScroll)
@@ -138,6 +168,12 @@ export default function Home() {
   // 恢复滚动位置
   useEffect(() => {
     if (loading) return
+    
+    // 如果设置了跳过标志，则不恢复滚动位置
+    if (skipScrollRestoreRef.current) {
+      skipScrollRestoreRef.current = false
+      return
+    }
     
     const savedPos = sessionStorage.getItem(`scrollPos_${activeTab}`)
     if (savedPos) {
@@ -602,7 +638,7 @@ export default function Home() {
     onError: (msg) => { showError(msg); loadCategories() }
   })
 
-  const displayCategories = selectedCategoryId ? categories.filter(c => c.id === selectedCategoryId) : categories
+  const displayCategories = categories
   const totalLinks = categories.reduce((s, c) => s + c.links.length, 0)
 
   if (loading) return (
@@ -730,7 +766,7 @@ export default function Home() {
               <span className="font-semibold text-text-main">{siteName}</span>
             </div>
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
-              <button onClick={() => setSelectedCategoryId(null)} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCategoryId === null ? 'bg-primary text-white font-medium' : 'text-text-main hover:bg-hover-bg'}`}>
+              <button onClick={() => scrollToCategory(null)} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedCategoryId === null && activeTab === 'nav' ? 'bg-primary text-white font-medium' : 'text-text-main hover:bg-hover-bg'}`}>
                 全部 ({totalLinks})
               </button>
               <SortableProvider items={categories.map(c => c.id)} strategy="vertical">
@@ -743,12 +779,21 @@ export default function Home() {
                     onClick={() => {
                       // 如果不在导航 tab，先切换到导航 tab
                       if (activeTab !== 'nav') {
+                        // 设置跳过滚动恢复标志
+                        skipScrollRestoreRef.current = true
                         setActiveTab('nav')
-                      }
-                      setSelectedCategoryId(cat.id)
-                      // 关闭移动端侧边栏
-                      if (window.innerWidth < 1024) {
-                        setSidebarOpen(false)
+                        // 等待 tab 切换和 DOM 渲染后再滚动
+                        const tryScroll = (attempts = 0) => {
+                          const element = document.getElementById(`category-${cat.id}`)
+                          if (element) {
+                            scrollToCategory(cat.id)
+                          } else if (attempts < 10) {
+                            setTimeout(() => tryScroll(attempts + 1), 50)
+                          }
+                        }
+                        setTimeout(() => tryScroll(), 50)
+                      } else {
+                        scrollToCategory(cat.id)
                       }
                     }}
                   />
@@ -873,7 +918,7 @@ export default function Home() {
                   </div>
                   
                   {/* 最近访问 - 只在非搜索状态且有访问记录时显示 */}
-                  {showRecentVisits && (searchEngine !== 'local' || !searchQuery.trim()) && !selectedCategoryId && !isEditMode && (() => {
+                  {showRecentVisits && (searchEngine !== 'local' || !searchQuery.trim()) && !isEditMode && (() => {
                     const recentLinks = categories
                       .flatMap(cat => cat.links.map(link => ({ ...link, categoryName: cat.name })))
                       .filter(link => link.lastVisitedAt)
@@ -925,7 +970,7 @@ export default function Home() {
                   <div className="max-w-6xl mx-auto space-y-8">
                     {displayCategories.map((cat) => (
                       <CategoryDropZone key={cat.id} categoryId={cat.id} categoryName={cat.name} isEditMode={isEditMode}>
-                        <section>
+                        <section id={`category-${cat.id}`} className="scroll-mt-14">
                           <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-semibold text-text-main">
                               {cat.name} <span className="text-sm font-normal text-text-secondary">({cat.links.length})</span>
@@ -1027,6 +1072,17 @@ export default function Home() {
             <Footer />
           </div>
           {sidebarOpen && <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+          
+          {/* 回到顶部按钮 */}
+          {showBackToTop && (
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="fixed right-4 bottom-4 z-50 w-10 h-10 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-hover active:scale-95 transition-all"
+              aria-label="回到顶部"
+            >
+              <ChevronUpIcon className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </DragDropProvider>
     </>
