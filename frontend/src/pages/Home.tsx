@@ -817,7 +817,7 @@ export default function Home() {
 
           {/* 主内容 */}
           <div className="lg:ml-60 flex-1 flex flex-col min-h-screen">
-            <header className="sticky top-0 z-20 bg-bg-card border-b border-border-main px-4 h-14 flex items-center justify-between">
+            <header className="fixed top-0 right-0 left-0 lg:left-60 z-20 bg-bg-card border-b border-border-main px-4 h-14 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden w-9 h-9 rounded-lg hover:bg-hover-bg flex items-center justify-center">
                   <Bars3Icon className="w-5 h-5 text-text-main" />
@@ -843,7 +843,7 @@ export default function Home() {
               </div>
             </header>
 
-            <main className="flex-1 p-4 lg:p-6" style={{ overflowX: 'hidden' }}>
+            <main className="flex-1 p-4 lg:p-6 mt-14" style={{ overflowX: 'hidden' }}>
               {activeTab === 'nav' && (
                 <>
                   <div className="max-w-2xl mx-auto mb-8">
